@@ -1,0 +1,14 @@
+.debug-menu {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  color: #0d1b2a;
+  border: 1px solid #0d1b2a;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.debug-menu input[type="checkbox"] {
+  accent-color: #0d1b2a;
+}
