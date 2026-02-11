@@ -2,6 +2,16 @@ import React, { useMemo } from 'react';
 import fontData from '../assets/maze-font.json';
 import { recursiveBacktracker } from '../lib/mazeGenerator';
 
+// --- CONSTANTS ---
+const UNIT_SIZE = 17;
+const CHAR_CONTENT_WIDTH = 8;
+const CHAR_CONTENT_HEIGHT = 12;
+const CHAR_PADDING_UNITS = 1;
+
+export const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
+export const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2;
+export const UNIT_SIZE_EXPORT = UNIT_SIZE;
+
 // --- HELPER TO CONVERT FONT WALLS TO FIXED CELL WALLS ---
 function fontWallsToFixedWalls(characters, gridWidth, gridHeight) {
   const fixedWalls = new Map();
@@ -54,8 +64,250 @@ function fontWallsToFixedWalls(characters, gridWidth, gridHeight) {
   return fixedWalls;
 }
 
+// --- FLOOD FILL TO FIND REACHABLE CELLS ---
+function findReachableCells(gridWidth, gridHeight, fixedWalls) {
+  const reachable = new Set();
+  const queue = [];
+
+  // Helper to check if we can move from (x,y) in a direction
+  const canMove = (x, y, dir) => {
+    const fixed = fixedWalls.get(`${x},${y}`);
+    if (fixed && fixed[dir]) return false;
+    return true;
+  };
+
+  // Start from all edge cells
+  for (let x = 0; x < gridWidth; x++) {
+    queue.push({ x, y: 0 });
+    queue.push({ x, y: gridHeight - 1 });
+  }
+  for (let y = 0; y < gridHeight; y++) {
+    queue.push({ x: 0, y });
+    queue.push({ x: gridWidth - 1, y });
+  }
+
+  while (queue.length > 0) {
+    const { x, y } = queue.shift();
+    const key = `${x},${y}`;
+    if (reachable.has(key)) continue;
+    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) continue;
+
+    reachable.add(key);
+
+    // Try moving in each direction
+    if (y > 0 && canMove(x, y, 'top') && canMove(x, y - 1, 'bottom')) {
+      queue.push({ x, y: y - 1 });
+    }
+    if (x < gridWidth - 1 && canMove(x, y, 'right') && canMove(x + 1, y, 'left')) {
+      queue.push({ x: x + 1, y });
+    }
+    if (y < gridHeight - 1 && canMove(x, y, 'bottom') && canMove(x, y + 1, 'top')) {
+      queue.push({ x, y: y + 1 });
+    }
+    if (x > 0 && canMove(x, y, 'left') && canMove(x - 1, y, 'right')) {
+      queue.push({ x: x - 1, y });
+    }
+  }
+
+  return reachable;
+}
+
+// --- IDENTIFY STROKE CELLS (part of 2-cell-wide corridor connected to outside) ---
+function findStrokeCells(reachable, fixedWalls, characters, gridWidth, gridHeight) {
+  // Build a set of cells that are within character content areas (excluding padding)
+  const contentAreaCells = new Set();
+  for (const { x: charX, y: charY } of characters) {
+    for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
+      for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
+        contentAreaCells.add(`${charX + dx},${charY + dy}`);
+      }
+    }
+  }
+
+  // Helper to check if a cell has a fixed wall on a given side
+  const hasWall = (x, y, dir) => {
+    const fixed = fixedWalls.get(`${x},${y}`);
+    return fixed && fixed[dir];
+  };
+
+  // Helper to check if a vertical corridor exists at (x, y)
+  const isVerticalCorridor = (x, y) => {
+    return hasWall(x, y, 'left') && hasWall(x + 1, y, 'right');
+  };
+
+  // Helper to check if a horizontal corridor exists at (x, y)
+  const isHorizontalCorridor = (x, y) => {
+    return hasWall(x, y, 'top') && hasWall(x, y + 1, 'bottom');
+  };
+
+  // Step 1: Find potential stroke cells (2-cell-wide corridors that extend)
+  const potentialStroke = new Set();
+
+  for (const key of reachable) {
+    if (!contentAreaCells.has(key)) continue;
+
+    const [x, y] = key.split(',').map(Number);
+
+    // Check for vertical corridor
+    if (hasWall(x, y, 'left') && contentAreaCells.has(`${x + 1},${y}`) && hasWall(x + 1, y, 'right')) {
+      const extendsUp = isVerticalCorridor(x, y - 1);
+      const extendsDown = isVerticalCorridor(x, y + 1);
+      const connectsHorizontal = isHorizontalCorridor(x, y) || isHorizontalCorridor(x, y - 1) ||
+                                  isHorizontalCorridor(x + 1, y) || isHorizontalCorridor(x + 1, y - 1);
+      if (extendsUp || extendsDown || connectsHorizontal) {
+        potentialStroke.add(key);
+      }
+    }
+
+    if (hasWall(x, y, 'right') && contentAreaCells.has(`${x - 1},${y}`) && hasWall(x - 1, y, 'left')) {
+      const extendsUp = isVerticalCorridor(x - 1, y - 1);
+      const extendsDown = isVerticalCorridor(x - 1, y + 1);
+      const connectsHorizontal = isHorizontalCorridor(x - 1, y) || isHorizontalCorridor(x - 1, y - 1) ||
+                                  isHorizontalCorridor(x, y) || isHorizontalCorridor(x, y - 1);
+      if (extendsUp || extendsDown || connectsHorizontal) {
+        potentialStroke.add(key);
+      }
+    }
+
+    // Check for horizontal corridor
+    if (hasWall(x, y, 'top') && contentAreaCells.has(`${x},${y + 1}`) && hasWall(x, y + 1, 'bottom')) {
+      const extendsLeft = isHorizontalCorridor(x - 1, y);
+      const extendsRight = isHorizontalCorridor(x + 1, y);
+      const connectsVertical = isVerticalCorridor(x, y) || isVerticalCorridor(x - 1, y) ||
+                                isVerticalCorridor(x, y + 1) || isVerticalCorridor(x - 1, y + 1);
+      if (extendsLeft || extendsRight || connectsVertical) {
+        potentialStroke.add(key);
+      }
+    }
+
+    if (hasWall(x, y, 'bottom') && contentAreaCells.has(`${x},${y - 1}`) && hasWall(x, y - 1, 'top')) {
+      const extendsLeft = isHorizontalCorridor(x - 1, y - 1);
+      const extendsRight = isHorizontalCorridor(x + 1, y - 1);
+      const connectsVertical = isVerticalCorridor(x, y - 1) || isVerticalCorridor(x - 1, y - 1) ||
+                                isVerticalCorridor(x, y) || isVerticalCorridor(x - 1, y);
+      if (extendsLeft || extendsRight || connectsVertical) {
+        potentialStroke.add(key);
+      }
+    }
+  }
+
+  // Step 2: Flood fill from padding through non-stroke cells to find "outside" cells
+  const canMove = (x, y, dir) => {
+    const fixed = fixedWalls.get(`${x},${y}`);
+    if (fixed && fixed[dir]) return false;
+    return true;
+  };
+
+  const outsideCells = new Set();
+  const outsideQueue = [];
+
+  // Start from padding cells (non-content area)
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (!contentAreaCells.has(`${x},${y}`)) {
+        outsideQueue.push(`${x},${y}`);
+      }
+    }
+  }
+
+  // Flood fill through reachable non-stroke cells
+  while (outsideQueue.length > 0) {
+    const key = outsideQueue.shift();
+    if (outsideCells.has(key)) continue;
+
+    const [x, y] = key.split(',').map(Number);
+    if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) continue;
+    if (!reachable.has(key)) continue;
+    if (potentialStroke.has(key)) continue; // Don't go through stroke
+
+    outsideCells.add(key);
+
+    const neighbors = [
+      { nx: x - 1, ny: y, dir: 'left', revDir: 'right' },
+      { nx: x + 1, ny: y, dir: 'right', revDir: 'left' },
+      { nx: x, ny: y - 1, dir: 'top', revDir: 'bottom' },
+      { nx: x, ny: y + 1, dir: 'bottom', revDir: 'top' },
+    ];
+
+    for (const { nx, ny, dir, revDir } of neighbors) {
+      const nKey = `${nx},${ny}`;
+      if (!outsideCells.has(nKey) && canMove(x, y, dir) && canMove(nx, ny, revDir)) {
+        outsideQueue.push(nKey);
+      }
+    }
+  }
+
+  // Find stroke cells adjacent to outside cells
+  const connectedStroke = new Set();
+  for (const key of potentialStroke) {
+    const [x, y] = key.split(',').map(Number);
+    const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+
+    for (const [nx, ny] of neighbors) {
+      if (outsideCells.has(`${nx},${ny}`)) {
+        connectedStroke.add(key);
+        break;
+      }
+    }
+  }
+
+  // Expand: stroke cells adjacent to connected stroke are also connected (if no wall between)
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const key of potentialStroke) {
+      if (connectedStroke.has(key)) continue;
+      const [x, y] = key.split(',').map(Number);
+      const neighbors = [
+        { nx: x - 1, ny: y, dir: 'left', revDir: 'right' },
+        { nx: x + 1, ny: y, dir: 'right', revDir: 'left' },
+        { nx: x, ny: y - 1, dir: 'top', revDir: 'bottom' },
+        { nx: x, ny: y + 1, dir: 'bottom', revDir: 'top' },
+      ];
+
+      for (const { nx, ny, dir, revDir } of neighbors) {
+        const nKey = `${nx},${ny}`;
+        if (connectedStroke.has(nKey) && canMove(x, y, dir) && canMove(nx, ny, revDir)) {
+          connectedStroke.add(key);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Step 3: Find enclosed corridor cells (2-cell-wide areas not connected to outside)
+  // These should have a center wall
+  const enclosedCorridors = new Set();
+
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const key = `${x},${y}`;
+      if (!contentAreaCells.has(key)) continue;
+      if (outsideCells.has(key)) continue;
+      if (potentialStroke.has(key)) continue;
+      if (!reachable.has(key)) continue; // Skip unreachable (holes inside letters)
+
+      // Check if this cell is part of a 2-cell-wide enclosed corridor
+      // Vertical: has wall on left, neighbor right has wall on right
+      if (hasWall(x, y, 'left') && hasWall(x + 1, y, 'right')) {
+        enclosedCorridors.add(key);
+        enclosedCorridors.add(`${x + 1},${y}`);
+      }
+      // Horizontal: has wall on top, neighbor below has wall on bottom
+      if (hasWall(x, y, 'top') && hasWall(x, y + 1, 'bottom')) {
+        enclosedCorridors.add(key);
+        enclosedCorridors.add(`${x},${y + 1}`);
+      }
+    }
+  }
+
+  // Return all for debugging and maze generation
+  return { connectedStroke, potentialStroke, enclosedCorridors };
+}
+
 // --- HELPER TO GENERATE MAZE ---
-function generateMaze(width, height, fixedWalls) {
+function generateMaze(width, height, fixedWalls, strokeCells, enclosedCorridors = new Set()) {
   const grid = Array.from({ length: height }, (_, y) =>
     Array.from({ length: width }, (_, x) => ({
       x, y, visited: false,
@@ -63,15 +315,82 @@ function generateMaze(width, height, fixedWalls) {
     }))
   );
 
-  const startCell = grid[0]?.[0] || null;
-  if (!startCell) return [];
+  // Pre-process stroke cells: remove non-fixed walls, mark as visited
+  for (const key of strokeCells) {
+    const [x, y] = key.split(',').map(Number);
+    const cell = grid[y][x];
+    const fixed = fixedWalls.get(key) || { top: false, right: false, bottom: false, left: false };
 
-  const mazeGrid = recursiveBacktracker(grid, startCell, fixedWalls);
+    // Remove walls that aren't fixed (make stroke an open corridor)
+    if (!fixed.top) {
+      cell.walls.top = false;
+      if (y > 0) grid[y - 1][x].walls.bottom = false;
+    }
+    if (!fixed.right) {
+      cell.walls.right = false;
+      if (x < width - 1) grid[y][x + 1].walls.left = false;
+    }
+    if (!fixed.bottom) {
+      cell.walls.bottom = false;
+      if (y < height - 1) grid[y + 1][x].walls.top = false;
+    }
+    if (!fixed.left) {
+      cell.walls.left = false;
+      if (x > 0) grid[y][x - 1].walls.right = false;
+    }
 
+    // Mark as visited so maze algorithm skips it
+    cell.visited = true;
+  }
+
+  // Pre-process enclosed corridors: add center walls (Rule 6)
+  // For 2-cell-wide enclosed corridors, keep the wall between the cells
+  const hasWall = (x, y, dir) => {
+    const fixed = fixedWalls.get(`${x},${y}`);
+    return fixed && fixed[dir];
+  };
+
+  const processedPairs = new Set();
+  for (const key of enclosedCorridors) {
+    const [x, y] = key.split(',').map(Number);
+
+    // Check for vertical enclosed corridor (left wall on x, right wall on x+1)
+    if (hasWall(x, y, 'left') && hasWall(x + 1, y, 'right')) {
+      const pairKey = `v:${x},${y}`;
+      if (!processedPairs.has(pairKey)) {
+        processedPairs.add(pairKey);
+        // Keep the wall between x and x+1 (add to fixedWalls-like behavior)
+        grid[y][x].walls.right = true;
+        if (x + 1 < width) grid[y][x + 1].walls.left = true;
+      }
+    }
+
+    // Check for horizontal enclosed corridor (top wall on y, bottom wall on y+1)
+    if (hasWall(x, y, 'top') && hasWall(x, y + 1, 'bottom')) {
+      const pairKey = `h:${x},${y}`;
+      if (!processedPairs.has(pairKey)) {
+        processedPairs.add(pairKey);
+        // Keep the wall between y and y+1
+        grid[y][x].walls.bottom = true;
+        if (y + 1 < height) grid[y + 1][x].walls.top = true;
+      }
+    }
+  }
+
+  // Run maze algorithm for all unvisited cells (handles disconnected regions like holes)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!grid[y][x].visited) {
+        recursiveBacktracker(grid, grid[y][x], fixedWalls);
+      }
+    }
+  }
+
+  // Convert grid to wall segments
   const walls = [];
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const cell = mazeGrid[y][x];
+      const cell = grid[y][x];
       if (cell.walls.top) walls.push([x, y, x + 1, y]);
       if (cell.walls.right) walls.push([x + 1, y, x + 1, y + 1]);
       if (cell.walls.bottom) walls.push([x, y + 1, x + 1, y + 1]);
@@ -81,19 +400,8 @@ function generateMaze(width, height, fixedWalls) {
   return walls;
 }
 
-
-// --- CONSTANTS ---
-const UNIT_SIZE = 17;
-const CHAR_CONTENT_WIDTH = 8;
-const CHAR_CONTENT_HEIGHT = 12;
-const CHAR_PADDING_UNITS = 1;
-
-export const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
-export const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2;
-export const UNIT_SIZE_EXPORT = UNIT_SIZE;
-
 const SvgGrid = ({ width, height, text, showFrames }) => {
-  const { mazeWalls, characters } = useMemo(() => {
+  const { mazeWalls, characters, strokeCellsArray, potentialStrokeArray } = useMemo(() => {
     if (width === 0 || height === 0) return { mazeWalls: [], characters: [] };
 
     const gridWidthUnits = Math.floor(width / UNIT_SIZE);
@@ -115,8 +423,24 @@ const SvgGrid = ({ width, height, text, showFrames }) => {
 
     // Convert font walls to fixed walls for maze generation
     const fixedWalls = fontWallsToFixedWalls(characters, gridWidthUnits, gridHeightUnits);
-    const mazeWalls = generateMaze(gridWidthUnits, gridHeightUnits, fixedWalls);
-    return { mazeWalls, characters };
+
+    // Find reachable cells (from grid edges) and stroke cells (connected to outside)
+    const reachable = findReachableCells(gridWidthUnits, gridHeightUnits, fixedWalls);
+    const { connectedStroke, potentialStroke, enclosedCorridors } = findStrokeCells(reachable, fixedWalls, characters, gridWidthUnits, gridHeightUnits);
+
+    const mazeWalls = generateMaze(gridWidthUnits, gridHeightUnits, fixedWalls, connectedStroke, enclosedCorridors);
+
+    // Debug: convert to arrays for visualization
+    const strokeCellsArray = Array.from(connectedStroke).map(key => {
+      const [x, y] = key.split(',').map(Number);
+      return { x, y };
+    });
+    const potentialStrokeArray = Array.from(potentialStroke).map(key => {
+      const [x, y] = key.split(',').map(Number);
+      return { x, y };
+    });
+
+    return { mazeWalls, characters, strokeCellsArray, potentialStrokeArray };
 
   }, [width, height, text]);
 
@@ -132,17 +456,37 @@ const SvgGrid = ({ width, height, text, showFrames }) => {
         />
       ))}
 
-      {/* 2. Render the characters and their walls on top */}
-      {characters.map(({ char, x, y }, index) => {
+      {/* 2. Debug: show potential stroke in yellow, connected stroke in red */}
+      {showFrames && potentialStrokeArray.map(({ x, y }, i) => (
+        <rect
+          key={`potential-${i}`}
+          x={x * UNIT_SIZE}
+          y={y * UNIT_SIZE}
+          width={UNIT_SIZE}
+          height={UNIT_SIZE}
+          fill="rgba(255, 255, 0, 0.3)"
+        />
+      ))}
+      {showFrames && strokeCellsArray.map(({ x, y }, i) => (
+        <rect
+          key={`stroke-${i}`}
+          x={x * UNIT_SIZE}
+          y={y * UNIT_SIZE}
+          width={UNIT_SIZE}
+          height={UNIT_SIZE}
+          fill="rgba(255, 0, 0, 0.4)"
+        />
+      ))}
+
+      {/* 3. Render the character debug frames and walls (only in debug mode) */}
+      {showFrames && characters.map(({ char, x, y }, index) => {
         const charData = fontData[char.toUpperCase()];
         const xPos = x * UNIT_SIZE;
         const yPos = y * UNIT_SIZE;
 
         return (
           <g key={index} transform={`translate(${xPos}, ${yPos})`}>
-            {showFrames &&
-              <rect x="0" y="0" width={CHAR_CELL_WIDTH_UNITS * UNIT_SIZE} height={CHAR_CELL_HEIGHT_UNITS * UNIT_SIZE} fill="rgba(68, 114, 196, 0.1)" />
-            }
+            <rect x="0" y="0" width={CHAR_CELL_WIDTH_UNITS * UNIT_SIZE} height={CHAR_CELL_HEIGHT_UNITS * UNIT_SIZE} fill="rgba(68, 114, 196, 0.1)" />
             {charData && charData.map((wall, i) => {
               const [x1, y1, x2, y2] = wall;
               return (
