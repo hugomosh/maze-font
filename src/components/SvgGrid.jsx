@@ -251,23 +251,44 @@ function findStrokeCells(reachable, fixedWalls, characters, gridWidth, gridHeigh
     }
   }
 
-  // Expand: stroke cells adjacent to connected stroke are also connected (if no wall between)
+  // Expand: only along corridor direction (vertical corridors expand up/down, horizontal expand left/right)
   let changed = true;
   while (changed) {
     changed = false;
     for (const key of potentialStroke) {
       if (connectedStroke.has(key)) continue;
       const [x, y] = key.split(',').map(Number);
+
+      // Determine this cell's corridor type
+      const isInVerticalCorridor = hasWall(x, y, 'left') || hasWall(x, y, 'right');
+      const isInHorizontalCorridor = hasWall(x, y, 'top') || hasWall(x, y, 'bottom');
+
       const neighbors = [
-        { nx: x - 1, ny: y, dir: 'left', revDir: 'right' },
-        { nx: x + 1, ny: y, dir: 'right', revDir: 'left' },
-        { nx: x, ny: y - 1, dir: 'top', revDir: 'bottom' },
-        { nx: x, ny: y + 1, dir: 'bottom', revDir: 'top' },
+        { nx: x - 1, ny: y, dir: 'left', revDir: 'right', isVerticalMove: false },
+        { nx: x + 1, ny: y, dir: 'right', revDir: 'left', isVerticalMove: false },
+        { nx: x, ny: y - 1, dir: 'top', revDir: 'bottom', isVerticalMove: true },
+        { nx: x, ny: y + 1, dir: 'bottom', revDir: 'top', isVerticalMove: true },
       ];
 
-      for (const { nx, ny, dir, revDir } of neighbors) {
+      for (const { nx, ny, dir, revDir, isVerticalMove } of neighbors) {
         const nKey = `${nx},${ny}`;
-        if (connectedStroke.has(nKey) && canMove(x, y, dir) && canMove(nx, ny, revDir)) {
+        if (!connectedStroke.has(nKey)) continue;
+        if (!canMove(x, y, dir) || !canMove(nx, ny, revDir)) continue;
+
+        // Only expand if movement follows corridor direction
+        // Vertical corridor: can move up/down; Horizontal corridor: can move left/right
+        const followsCorridorDirection =
+          (isInVerticalCorridor && isVerticalMove) ||
+          (isInHorizontalCorridor && !isVerticalMove);
+
+        // Also check if neighbor is in same type of corridor (for corners)
+        const neighborIsVertical = hasWall(nx, ny, 'left') || hasWall(nx, ny, 'right');
+        const neighborIsHorizontal = hasWall(nx, ny, 'top') || hasWall(nx, ny, 'bottom');
+        const isCornerConnection =
+          (isInVerticalCorridor && neighborIsHorizontal) ||
+          (isInHorizontalCorridor && neighborIsVertical);
+
+        if (followsCorridorDirection || isCornerConnection) {
           connectedStroke.add(key);
           changed = true;
           break;
