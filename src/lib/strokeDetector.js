@@ -121,49 +121,111 @@ export function detectStrokes(char, fontData, gridWidth, gridHeight) {
   const potentialStroke = new Set(); // Keep for compatibility, but unused
   const connectedStroke = new Set(); // Keep for compatibility, but unused
 
-  // SIMPLIFIED: Strokes are cells with walls from font lines
-  // Cells with 3+ walls = always strokes (corners/intersections)
-  // Cells with 2 walls = strokes only if part of 2-cell corridor with internal wall
-  const enclosedCorridors = new Set();
+  // SIMPLIFIED UNIFIED FLOOD FILL ALGORITHM FOR STROKES
+  // One flood fill catches everything: corridors, corners, intersections, dots
 
+  const enclosedCorridors = new Set();
+  const strokeQueue = [];
+
+  // Helper: get wall count for a cell
+  const getWallCount = (x, y) => {
+    return (
+      (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
+      (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
+      (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
+      (hasWall(fixedWalls, x, y, "left") ? 1 : 0)
+    );
+  };
+
+  // Helper: check if two cells are connected (no wall between)
+  const isConnected = (x1, y1, x2, y2) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    if (dx === 1) return !hasWall(fixedWalls, x1, y1, "right") && !hasWall(fixedWalls, x2, y2, "left");
+    if (dx === -1) return !hasWall(fixedWalls, x1, y1, "left") && !hasWall(fixedWalls, x2, y2, "right");
+    if (dy === 1) return !hasWall(fixedWalls, x1, y1, "bottom") && !hasWall(fixedWalls, x2, y2, "top");
+    if (dy === -1) return !hasWall(fixedWalls, x1, y1, "top") && !hasWall(fixedWalls, x2, y2, "bottom");
+
+    return false;
+  };
+
+  // STEP 1: Find seeds - high confidence strokes (3+ walls OR 2 opposite walls)
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
       const key = `${x},${y}`;
-
-      // Check all content cells
       if (!contentAreaCells.has(key)) continue;
 
-      // Count walls for this cell
-      const wallCount =
-        (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
-        (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
-        (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
-        (hasWall(fixedWalls, x, y, "left") ? 1 : 0);
+      const wallCount = getWallCount(x, y);
 
-      // 3+ walls = always stroke (corners/intersections)
+      // 3+ walls = always stroke (intersections)
       if (wallCount >= 3) {
         enclosedCorridors.add(key);
+        strokeQueue.push({ x, y });
         continue;
       }
 
-      // 2 walls on opposite sides = corridor = stroke
+      // 2 opposite walls = always stroke (corridors)
       if (wallCount === 2) {
         const hasLeft = hasWall(fixedWalls, x, y, "left");
         const hasRight = hasWall(fixedWalls, x, y, "right");
         const hasTop = hasWall(fixedWalls, x, y, "top");
         const hasBottom = hasWall(fixedWalls, x, y, "bottom");
 
-        const isVerticalCorridor = hasLeft && hasRight;
-        const isHorizontalCorridor = hasTop && hasBottom;
-
-        if (isVerticalCorridor || isHorizontalCorridor) {
+        if ((hasLeft && hasRight) || (hasTop && hasBottom)) {
           enclosedCorridors.add(key);
+          strokeQueue.push({ x, y });
         }
       }
     }
   }
 
-  // FLOOD FILL: Propagate strokes to adjacent corners (2 adjacent walls) if no wall between
+  // STEP 2: Flood from seeds to connected corridors (2 opposite walls) and intersections (3+ walls)
+  // Don't flood to corners (2 adjacent walls) yet - handle those separately
+  while (strokeQueue.length > 0) {
+    const { x, y } = strokeQueue.shift();
+
+    // Check all 4 neighbors
+    const neighbors = [
+      [x - 1, y],
+      [x + 1, y],
+      [x, y - 1],
+      [x, y + 1],
+    ];
+
+    for (const [nx, ny] of neighbors) {
+      const nKey = `${nx},${ny}`;
+
+      // Skip if not content or already processed
+      if (!contentAreaCells.has(nKey)) continue;
+      if (enclosedCorridors.has(nKey)) continue;
+
+      const nWallCount = getWallCount(nx, ny);
+
+      // Only flood to cells with 3+ walls or 2 opposite walls
+      if (nWallCount >= 3 && isConnected(x, y, nx, ny)) {
+        // 3+ walls = intersection
+        enclosedCorridors.add(nKey);
+        strokeQueue.push({ x: nx, y: ny });
+      } else if (nWallCount === 2) {
+        // Check if 2 opposite walls (corridor)
+        const hasLeft = hasWall(fixedWalls, nx, ny, "left");
+        const hasRight = hasWall(fixedWalls, nx, ny, "right");
+        const hasTop = hasWall(fixedWalls, nx, ny, "top");
+        const hasBottom = hasWall(fixedWalls, nx, ny, "bottom");
+
+        if (((hasLeft && hasRight) || (hasTop && hasBottom)) && isConnected(x, y, nx, ny)) {
+          // 2 opposite walls = corridor
+          enclosedCorridors.add(nKey);
+          strokeQueue.push({ x: nx, y: ny });
+        }
+      }
+    }
+  }
+
+  // STEP 3: Separate pass for corners (2 adjacent walls)
+  // Add corners that are connected to strokes (both reachable and unreachable)
+  // This catches stroke corners while leaving isolated hole corners unmarked
   let changed = true;
   while (changed) {
     changed = false;
@@ -171,70 +233,36 @@ export function detectStrokes(char, fontData, gridWidth, gridHeight) {
       for (let x = 0; x < gridWidth; x++) {
         const key = `${x},${y}`;
 
-        // Skip if already a stroke or not content
         if (!contentAreaCells.has(key)) continue;
         if (enclosedCorridors.has(key)) continue;
 
-        // Check if this is a corner (2 adjacent walls)
-        const wallCount =
-          (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
-          (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
-          (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
-          (hasWall(fixedWalls, x, y, "left") ? 1 : 0);
+        const wallCount = getWallCount(x, y);
+        if (wallCount !== 2) continue; // Only interested in 2-wall cells
 
-        if (wallCount !== 2) continue; // Not a corner
-
+        // Check if 2 adjacent walls (corner)
         const hasLeft = hasWall(fixedWalls, x, y, "left");
         const hasRight = hasWall(fixedWalls, x, y, "right");
         const hasTop = hasWall(fixedWalls, x, y, "top");
         const hasBottom = hasWall(fixedWalls, x, y, "bottom");
 
-        // Skip if not adjacent walls (if opposite, already handled above)
+        // Skip if opposite walls (already handled)
         if ((hasLeft && hasRight) || (hasTop && hasBottom)) continue;
 
-        // Check neighbors - if adjacent to stroke AND no wall between, add to stroke
+        // This is a corner - check if connected to any stroke
         const neighbors = [
-          { nx: x - 1, ny: y, dir: "left", revDir: "right" },
-          { nx: x + 1, ny: y, dir: "right", revDir: "left" },
-          { nx: x, ny: y - 1, dir: "top", revDir: "bottom" },
-          { nx: x, ny: y + 1, dir: "bottom", revDir: "top" },
+          [x - 1, y],
+          [x + 1, y],
+          [x, y - 1],
+          [x, y + 1],
         ];
 
-        for (const { nx, ny, dir, revDir } of neighbors) {
-          const nKey = `${nx},${ny}`;
-          if (enclosedCorridors.has(nKey)) {
-            // Neighbor is a stroke - check if no wall between
-            if (!hasWall(fixedWalls, x, y, dir) && !hasWall(fixedWalls, nx, ny, revDir)) {
-              enclosedCorridors.add(key);
-              changed = true;
-              break;
-            }
+        for (const [nx, ny] of neighbors) {
+          if (enclosedCorridors.has(`${nx},${ny}`) && isConnected(x, y, nx, ny)) {
+            enclosedCorridors.add(key);
+            changed = true;
+            break;
           }
         }
-      }
-    }
-  }
-
-  // DOT FIX: Unreachable cells with 2+ walls are dots (collapsed strokes), not holes
-  // Examples: '.', ';', '%' have small dots that should be strokes
-  for (let y = 0; y < gridHeight; y++) {
-    for (let x = 0; x < gridWidth; x++) {
-      const key = `${x},${y}`;
-
-      // Only check unreachable content cells that aren't already strokes
-      if (!contentAreaCells.has(key)) continue;
-      if (reachable.has(key)) continue;
-      if (enclosedCorridors.has(key)) continue;
-
-      // Count walls - if 2+, it's a dot (small enclosed stroke)
-      const wallCount =
-        (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
-        (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
-        (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
-        (hasWall(fixedWalls, x, y, "left") ? 1 : 0);
-
-      if (wallCount >= 2) {
-        enclosedCorridors.add(key);
       }
     }
   }
