@@ -215,6 +215,30 @@ export function detectStrokes(char, fontData, gridWidth, gridHeight) {
     }
   }
 
+  // DOT FIX: Unreachable cells with 2+ walls are dots (collapsed strokes), not holes
+  // Examples: '.', ';', '%' have small dots that should be strokes
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const key = `${x},${y}`;
+
+      // Only check unreachable content cells that aren't already strokes
+      if (!contentAreaCells.has(key)) continue;
+      if (reachable.has(key)) continue;
+      if (enclosedCorridors.has(key)) continue;
+
+      // Count walls - if 2+, it's a dot (small enclosed stroke)
+      const wallCount =
+        (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
+        (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
+        (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
+        (hasWall(fixedWalls, x, y, "left") ? 1 : 0);
+
+      if (wallCount >= 2) {
+        enclosedCorridors.add(key);
+      }
+    }
+  }
+
   // Outside = reachable cells that are NOT strokes
   const outsideCells = new Set();
   for (const key of reachable) {
