@@ -24,6 +24,20 @@ const StrokeTest = ({ char = "N" }) => {
     return detectStrokes(char, fontData, gridWidth, gridHeight);
   }, [char, fontData, gridWidth, gridHeight]);
 
+  // Calculate hole cells count (enclosed cells that are not corridors)
+  const holeCellsCount = useMemo(() => {
+    let count = 0;
+    for (let y = 1; y < gridHeight - 1; y++) {
+      for (let x = 1; x < gridWidth - 1; x++) {
+        const key = `${x},${y}`;
+        if (!outsideCells.has(key) && !potentialStroke.has(key) && !enclosedCorridors.has(key)) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }, [outsideCells, potentialStroke, enclosedCorridors, gridWidth, gridHeight]);
+
   const width = gridWidth * UNIT_SIZE;
   const height = gridHeight * UNIT_SIZE;
 
@@ -149,15 +163,10 @@ const StrokeTest = ({ char = "N" }) => {
       </svg>
 
       <div style={{ marginTop: 10 }}>
-        <strong>Potential stroke cells:</strong> {potentialStroke.size}
+        <strong>Stroke cells:</strong> {enclosedCorridors.size}
         <br />
-        <strong>Connected stroke cells:</strong> {connectedStroke.size}
+        <strong>Hole cells:</strong> {holeCellsCount}
         <br />
-        <strong>Problem cells (should NOT be orange):</strong>
-        <span style={{ color: "red" }}>
-          {" "}
-          Check for orange cells in enclosed areas
-        </span>
       </div>
     </div>
   );
