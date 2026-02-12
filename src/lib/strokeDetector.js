@@ -116,181 +116,110 @@ export function detectStrokes(char, fontData, gridWidth, gridHeight) {
       queue.push({ x: x - 1, y });
   }
 
-  // Find potential stroke cells
-  const potentialStroke = new Set();
-  for (const key of reachable) {
-    if (!contentAreaCells.has(key)) continue;
-    const [x, y] = key.split(",").map(Number);
+  // Letter strokes are ALL 2-cell-wide corridors (enclosed by walls)
+  // We filter out "holes" by checking if they're reachable from outside
+  const potentialStroke = new Set(); // Keep for compatibility, but unused
+  const connectedStroke = new Set(); // Keep for compatibility, but unused
 
-    if (
-      hasWall(fixedWalls, x, y, "left") &&
-      contentAreaCells.has(`${x + 1},${y}`) &&
-      hasWall(fixedWalls, x + 1, y, "right")
-    ) {
-      const extendsUp = isVerticalCorridor(fixedWalls, x, y - 1);
-      const extendsDown = isVerticalCorridor(fixedWalls, x, y + 1);
-      const connectsHorizontal =
-        isHorizontalCorridor(fixedWalls, x, y) ||
-        isHorizontalCorridor(fixedWalls, x, y - 1) ||
-        isHorizontalCorridor(fixedWalls, x + 1, y) ||
-        isHorizontalCorridor(fixedWalls, x + 1, y - 1);
-      console.log(`Cell ${key} (left wall check): extendsUp=${extendsUp}, extendsDown=${extendsDown}, connectsHorizontal=${connectsHorizontal}`);
-      if (
-        (extendsUp && extendsDown && connectsHorizontal) || // Straight vertical AND connected horizontally
-        (extendsUp && !extendsDown && connectsHorizontal) || // Extends up and connects horizontally (a bend)
-        (!extendsUp && extendsDown && connectsHorizontal) || // Extends down and connects horizontally (a bend)
-        (connectsHorizontal && !extendsUp && !extendsDown) // Only horizontal connection (a short bend)
-      ) {
-        potentialStroke.add(key);
+  // SIMPLIFIED: Strokes are cells with walls from font lines
+  // Cells with 3+ walls = always strokes (corners/intersections)
+  // Cells with 2 walls = strokes only if part of 2-cell corridor with internal wall
+  const enclosedCorridors = new Set();
+
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const key = `${x},${y}`;
+
+      // Check all content cells
+      if (!contentAreaCells.has(key)) continue;
+
+      // Count walls for this cell
+      const wallCount =
+        (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
+        (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
+        (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
+        (hasWall(fixedWalls, x, y, "left") ? 1 : 0);
+
+      // 3+ walls = always stroke (corners/intersections)
+      if (wallCount >= 3) {
+        enclosedCorridors.add(key);
+        continue;
       }
-    }
 
-    if (
-      hasWall(fixedWalls, x, y, "right") &&
-      contentAreaCells.has(`${x - 1},${y}`) &&
-      hasWall(fixedWalls, x - 1, y, "left")
-    ) {
-      const extendsUp = isVerticalCorridor(fixedWalls, x - 1, y - 1);
-      const extendsDown = isVerticalCorridor(fixedWalls, x - 1, y + 1);
-      const connectsHorizontal =
-        isHorizontalCorridor(fixedWalls, x - 1, y) ||
-        isHorizontalCorridor(fixedWalls, x - 1, y - 1) ||
-        isHorizontalCorridor(fixedWalls, x, y) ||
-        isHorizontalCorridor(fixedWalls, x, y - 1);
-      console.log(`Cell ${key} (right wall check): extendsUp=${extendsUp}, extendsDown=${extendsDown}, connectsHorizontal=${connectsHorizontal}`);
-      if (
-        (extendsUp && extendsDown && connectsHorizontal) || // Straight vertical AND connected horizontally
-        (extendsUp && !extendsDown && connectsHorizontal) || // Extends up and connects horizontally (a bend)
-        (!extendsUp && extendsDown && connectsHorizontal) || // Extends down and connects horizontally (a bend)
-        (connectsHorizontal && !extendsUp && !extendsDown) // Only horizontal connection (a short bend)
-      ) {
-        potentialStroke.add(key);
-      }
-    }
+      // 2 walls on opposite sides = corridor = stroke
+      if (wallCount === 2) {
+        const hasLeft = hasWall(fixedWalls, x, y, "left");
+        const hasRight = hasWall(fixedWalls, x, y, "right");
+        const hasTop = hasWall(fixedWalls, x, y, "top");
+        const hasBottom = hasWall(fixedWalls, x, y, "bottom");
 
-    if (
-      hasWall(fixedWalls, x, y, "top") &&
-      contentAreaCells.has(`${x},${y + 1}`) &&
-      hasWall(fixedWalls, x, y + 1, "bottom")
-    ) {
-      const extendsLeft = isHorizontalCorridor(fixedWalls, x - 1, y);
-      const extendsRight = isHorizontalCorridor(fixedWalls, x + 1, y);
-      const connectsVertical =
-        isVerticalCorridor(fixedWalls, x, y) ||
-        isVerticalCorridor(fixedWalls, x - 1, y) ||
-        isVerticalCorridor(fixedWalls, x, y + 1) ||
-        isVerticalCorridor(fixedWalls, x - 1, y + 1);
-      console.log(`Cell ${key} (top wall check): extendsLeft=${extendsLeft}, extendsRight=${extendsRight}, connectsVertical=${connectsVertical}`);
-      if (
-        (extendsLeft && extendsRight && connectsVertical) || // Straight horizontal AND connected vertically
-        (extendsLeft && !extendsRight && connectsVertical) || // Extends left and connects vertically (a bend)
-        (!extendsLeft && extendsRight && connectsVertical) || // Extends right and connects vertically (a bend)
-        (connectsVertical && !extendsLeft && !extendsRight) // Only vertical connection (a short bend)
-      ) {
-        potentialStroke.add(key);
-      }
-    }
+        const isVerticalCorridor = hasLeft && hasRight;
+        const isHorizontalCorridor = hasTop && hasBottom;
 
-    if (
-      hasWall(fixedWalls, x, y, "bottom") &&
-      contentAreaCells.has(`${x},${y - 1}`) &&
-      hasWall(fixedWalls, x, y - 1, "top")
-    ) {
-      const extendsLeft = isHorizontalCorridor(fixedWalls, x - 1, y - 1);
-      const extendsRight = isHorizontalCorridor(fixedWalls, x + 1, y - 1);
-      const connectsVertical =
-        isVerticalCorridor(fixedWalls, x, y - 1) ||
-        isVerticalCorridor(fixedWalls, x - 1, y - 1) ||
-        isVerticalCorridor(fixedWalls, x, y) ||
-        isVerticalCorridor(fixedWalls, x - 1, y);
-      console.log(`Cell ${key} (bottom wall check): extendsLeft=${extendsLeft}, extendsRight=${extendsRight}, connectsVertical=${connectsVertical}`);
-      if (
-        (extendsLeft && extendsRight && connectsVertical) || // Straight horizontal AND connected vertically
-        (extendsLeft && !extendsRight && connectsVertical) || // Extends left and connects vertically (a bend)
-        (!extendsLeft && extendsRight && connectsVertical) || // Extends right and connects vertically (a bend)
-        (connectsVertical && !extendsLeft && !extendsRight) // Only vertical connection (a short bend)
-      ) {
-        potentialStroke.add(key);
-      }
-    }
-  }
-
-  // Simplified: All reachable cells that are not potential strokes are "outside"
-  const outsideCells = new Set();
-  for (const key of reachable) {
-    if (!potentialStroke.has(key)) {
-      outsideCells.add(key);
-    }
-  }
-
-  // Now find stroke cells adjacent to outside cells
-  const connectedStroke = new Set();
-  for (const key of potentialStroke) {
-    const [x, y] = key.split(",").map(Number);
-    const neighbors = [
-      [x - 1, y],
-      [x + 1, y],
-      [x, y - 1],
-      [x, y + 1],
-    ];
-
-    for (const [nx, ny] of neighbors) {
-      if (outsideCells.has(`${nx},${ny}`)) {
-        connectedStroke.add(key);
-        break;
-      }
-    }
-  }
-
-  // Expand: stroke cells adjacent to connected stroke are also connected (if no wall between)
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const key of potentialStroke) {
-      if (connectedStroke.has(key)) continue;
-      const [x, y] = key.split(",").map(Number);
-      const neighbors = [
-        { nx: x - 1, ny: y, dir: "left", revDir: "right" },
-        { nx: x + 1, ny: y, dir: "right", revDir: "left" },
-        { nx: x, ny: y - 1, dir: "top", revDir: "bottom" },
-        { nx: x, ny: y + 1, dir: "bottom", revDir: "top" },
-      ];
-
-      for (const { nx, ny, dir, revDir } of neighbors) {
-        const nKey = `${nx},${ny}`;
-        if (
-          connectedStroke.has(nKey) &&
-          canMove(x, y, dir) &&
-          canMove(nx, ny, revDir)
-        ) {
-          connectedStroke.add(key);
-          changed = true;
-          break;
+        if (isVerticalCorridor || isHorizontalCorridor) {
+          enclosedCorridors.add(key);
         }
       }
     }
   }
 
-  // Find enclosed corridors (2-cell-wide areas bounded by walls, not connected to outside)
-  const enclosedCorridors = new Set();
-  for (let y = 0; y < gridHeight; y++) {
-    for (let x = 0; x < gridWidth; x++) {
-      const key = `${x},${y}`;
-      if (!contentAreaCells.has(key)) continue;
-      if (outsideCells.has(key)) continue;
-      if (potentialStroke.has(key)) continue;
-      if (!reachable.has(key)) continue;
+  // FLOOD FILL: Propagate strokes to adjacent corners (2 adjacent walls) if no wall between
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let y = 0; y < gridHeight; y++) {
+      for (let x = 0; x < gridWidth; x++) {
+        const key = `${x},${y}`;
 
-      // Vertical corridor pattern
-      if (hasWall(fixedWalls, x, y, "left") && hasWall(fixedWalls, x + 1, y, "right")) {
-        enclosedCorridors.add(key);
-        enclosedCorridors.add(`${x + 1},${y}`);
+        // Skip if already a stroke or not content
+        if (!contentAreaCells.has(key)) continue;
+        if (enclosedCorridors.has(key)) continue;
+
+        // Check if this is a corner (2 adjacent walls)
+        const wallCount =
+          (hasWall(fixedWalls, x, y, "top") ? 1 : 0) +
+          (hasWall(fixedWalls, x, y, "right") ? 1 : 0) +
+          (hasWall(fixedWalls, x, y, "bottom") ? 1 : 0) +
+          (hasWall(fixedWalls, x, y, "left") ? 1 : 0);
+
+        if (wallCount !== 2) continue; // Not a corner
+
+        const hasLeft = hasWall(fixedWalls, x, y, "left");
+        const hasRight = hasWall(fixedWalls, x, y, "right");
+        const hasTop = hasWall(fixedWalls, x, y, "top");
+        const hasBottom = hasWall(fixedWalls, x, y, "bottom");
+
+        // Skip if not adjacent walls (if opposite, already handled above)
+        if ((hasLeft && hasRight) || (hasTop && hasBottom)) continue;
+
+        // Check neighbors - if adjacent to stroke AND no wall between, add to stroke
+        const neighbors = [
+          { nx: x - 1, ny: y, dir: "left", revDir: "right" },
+          { nx: x + 1, ny: y, dir: "right", revDir: "left" },
+          { nx: x, ny: y - 1, dir: "top", revDir: "bottom" },
+          { nx: x, ny: y + 1, dir: "bottom", revDir: "top" },
+        ];
+
+        for (const { nx, ny, dir, revDir } of neighbors) {
+          const nKey = `${nx},${ny}`;
+          if (enclosedCorridors.has(nKey)) {
+            // Neighbor is a stroke - check if no wall between
+            if (!hasWall(fixedWalls, x, y, dir) && !hasWall(fixedWalls, nx, ny, revDir)) {
+              enclosedCorridors.add(key);
+              changed = true;
+              break;
+            }
+          }
+        }
       }
-      // Horizontal corridor pattern
-      if (hasWall(fixedWalls, x, y, "top") && hasWall(fixedWalls, x, y + 1, "bottom")) {
-        enclosedCorridors.add(key);
-        enclosedCorridors.add(`${x},${y + 1}`);
-      }
+    }
+  }
+
+  // Outside = reachable cells that are NOT strokes
+  const outsideCells = new Set();
+  for (const key of reachable) {
+    if (!enclosedCorridors.has(key)) {
+      outsideCells.add(key);
     }
   }
 
@@ -301,5 +230,6 @@ export function detectStrokes(char, fontData, gridWidth, gridHeight) {
     connectedStroke,
     outsideCells,
     enclosedCorridors,
+    reachable,
   };
 }

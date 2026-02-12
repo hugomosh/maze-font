@@ -3,7 +3,7 @@ import { detectStrokes } from '../lib/strokeDetector';
 import fontData from '../assets/maze-font.json';
 
 const CHAR_CONTENT_WIDTH = 8;
-const CHAR_CONTENT_HEIGHT = 14; // Updated from 12 to 14
+const CHAR_CONTENT_HEIGHT = 14;
 const CHAR_PADDING_UNITS = 1;
 const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2; // 10
 const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2; // 16
@@ -11,53 +11,99 @@ const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2; // 
 describe('detectStrokes', () => {
   it('should correctly classify cells for character N', () => {
     const char = 'N';
-    const { outsideCells, connectedStroke, potentialStroke } = detectStrokes(
+    const { outsideCells, enclosedCorridors, reachable } = detectStrokes(
       char,
       fontData,
       CHAR_CELL_WIDTH_UNITS,
       CHAR_CELL_HEIGHT_UNITS
     );
 
-    // User states cells 3,5 and 3,12 for 'N' should be green (outside)
-    // In grid coordinates, this means checking if they are NOT in connectedStroke
-    // And ideally, they should be in outsideCells
-    
-    // (3,5) for 'N'
-    expect(connectedStroke.has('3,5')).toBeFalsy();
-    expect(outsideCells.has('3,5')).toBeTruthy();
-    expect(potentialStroke.has('3,5')).toBeFalsy(); // Should not be a potential stroke if it's outside
+    // Letter strokes (purple) - these cells are part of the 'N' strokes
+    expect(enclosedCorridors.has('1,1')).toBeTruthy();
+    expect(enclosedCorridors.has('2,2')).toBeTruthy();
+    expect(enclosedCorridors.has('5,12')).toBeTruthy();
+    expect(enclosedCorridors.has('7,2')).toBeTruthy();
 
-    // (3,12) for 'N'
-    expect(connectedStroke.has('3,12')).toBeFalsy();
-    expect(outsideCells.has('3,12')).toBeTruthy();
-    expect(potentialStroke.has('3,12')).toBeFalsy(); // Should not be a potential stroke if it's outside
+    // Outside areas (green) - where maze will be generated
+    expect(outsideCells.has('3,3')).toBeTruthy();
+    expect(outsideCells.has('4,12')).toBeTruthy();
 
-    // Add more assertions based on expected behavior for 'N'
-    // For example, parts of the actual 'N' stroke should be in connectedStroke
-    expect(connectedStroke.has('2,2')).toBeTruthy();
-    expect(connectedStroke.has('7,2')).toBeTruthy();
-    expect(connectedStroke.has('5,7')).toBeTruthy();
+    // These should NOT be strokes
+    expect(enclosedCorridors.has('3,3')).toBeFalsy();
+    expect(enclosedCorridors.has('4,12')).toBeFalsy();
   });
 
   it('should correctly classify cells for character 5', () => {
     const char = '5';
-    const { outsideCells, connectedStroke, potentialStroke } = detectStrokes(
+    const { outsideCells, enclosedCorridors } = detectStrokes(
       char,
       fontData,
       CHAR_CELL_WIDTH_UNITS,
       CHAR_CELL_HEIGHT_UNITS
     );
 
-
-    expect(connectedStroke.has('2,2')).toBeTruthy();
-    expect(connectedStroke.has('7,12')).toBeTruthy(); // Check a cell in the extended height
-
-
+    // Outside areas (green) - where maze will be generated
     expect(outsideCells.has('1,7')).toBeTruthy();
+    expect(outsideCells.has('2,8')).toBeTruthy();
     expect(outsideCells.has('8,3')).toBeTruthy();
     expect(outsideCells.has('4,3')).toBeTruthy();
-    expect(connectedStroke.has('4,9')).toBeFalsy();
+
+    // These should NOT be strokes
+    expect(enclosedCorridors.has('1,7')).toBeFalsy();
+    expect(enclosedCorridors.has('2,8')).toBeFalsy();
+    expect(enclosedCorridors.has('8,3')).toBeFalsy();
+    expect(enclosedCorridors.has('4,3')).toBeFalsy();
   });
 
-  // Add more tests for other scenarios (e.g., enclosed corridors, isolated holes)
+  it('should correctly classify cells for character 7', () => {
+    const char = '7';
+    const { enclosedCorridors } = detectStrokes(
+      char,
+      fontData,
+      CHAR_CELL_WIDTH_UNITS,
+      CHAR_CELL_HEIGHT_UNITS
+    );
+
+    // Bottom of the stroke
+    expect(enclosedCorridors.has('7,12')).toBeTruthy();
+    expect(enclosedCorridors.has('8,12')).toBeTruthy();
+  });
+
+  it('should correctly classify cells for character 8', () => {
+    const char = '8';
+    const { outsideCells, enclosedCorridors, reachable } = detectStrokes(
+      char,
+      fontData,
+      CHAR_CELL_WIDTH_UNITS,
+      CHAR_CELL_HEIGHT_UNITS
+    );
+
+    // Three-way stroke intersection (left side)
+    expect(enclosedCorridors.has('1,5')).toBeTruthy();
+    expect(enclosedCorridors.has('1,6')).toBeTruthy();
+    expect(enclosedCorridors.has('2,5')).toBeTruthy();
+    expect(enclosedCorridors.has('2,6')).toBeTruthy();
+
+    // Upper hole (blue) - NOT reachable, NOT strokes
+    expect(reachable.has('3,3')).toBeFalsy();
+    expect(reachable.has('3,4')).toBeFalsy();
+    expect(reachable.has('4,3')).toBeFalsy();
+    expect(reachable.has('4,4')).toBeFalsy();
+    expect(reachable.has('5,3')).toBeFalsy();
+    expect(reachable.has('5,4')).toBeFalsy();
+    expect(reachable.has('6,3')).toBeFalsy();
+    expect(reachable.has('6,4')).toBeFalsy();
+
+    expect(enclosedCorridors.has('3,3')).toBeFalsy();
+    expect(enclosedCorridors.has('6,3')).toBeFalsy();
+
+    // Lower hole (blue) - NOT reachable, NOT strokes
+    expect(reachable.has('3,7')).toBeFalsy();
+    expect(reachable.has('3,10')).toBeFalsy();
+    expect(reachable.has('6,7')).toBeFalsy();
+    expect(reachable.has('6,10')).toBeFalsy();
+
+    expect(enclosedCorridors.has('3,7')).toBeFalsy();
+    expect(enclosedCorridors.has('6,10')).toBeFalsy();
+  });
 });
