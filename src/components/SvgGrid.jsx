@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import fontData from '../assets/maze-font.json';
 import { recursiveBacktracker } from '../lib/mazeGenerator';
+import { generateWordMaze } from '../lib/wordMazeGenerator';
 
 // --- CONSTANTS ---
 const UNIT_SIZE = 17;
@@ -421,12 +422,30 @@ function generateMaze(width, height, fixedWalls, strokeCells, enclosedCorridors 
   return walls;
 }
 
-const SvgGrid = ({ width, height, text, showFrames }) => {
-  const { mazeWalls, characters, strokeCellsArray, potentialStrokeArray } = useMemo(() => {
-    if (width === 0 || height === 0) return { mazeWalls: [], characters: [] };
+const SvgGrid = ({ width, height, text, showFrames, wordMazeMode }) => {
+  const result = useMemo(() => {
+    if (width === 0 || height === 0) return { mazeWalls: [], characters: [], strokeCellsArray: [], potentialStrokeArray: [], wordMazeData: null };
 
     const gridWidthUnits = Math.floor(width / UNIT_SIZE);
     const gridHeightUnits = Math.floor(height / UNIT_SIZE);
+
+    // --- Word Maze Mode ---
+    if (wordMazeMode) {
+      const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData);
+      const strokeCellsArray = Array.from(wmResult.strokeCells || []).map(key => {
+        const [x, y] = key.split(',').map(Number);
+        return { x, y };
+      });
+      return {
+        mazeWalls: wmResult.walls,
+        characters: wmResult.characters,
+        strokeCellsArray,
+        potentialStrokeArray: [],
+        wordMazeData: wmResult,
+      };
+    }
+
+    // --- Classic Mode ---
     const charsPerGridRow = Math.floor(gridWidthUnits / CHAR_CELL_WIDTH_UNITS);
 
     const characters = text.split('').map((char, index) => {
@@ -461,9 +480,11 @@ const SvgGrid = ({ width, height, text, showFrames }) => {
       return { x, y };
     });
 
-    return { mazeWalls, characters, strokeCellsArray, potentialStrokeArray };
+    return { mazeWalls, characters, strokeCellsArray, potentialStrokeArray, wordMazeData: null };
 
-  }, [width, height, text]);
+  }, [width, height, text, wordMazeMode]);
+
+  const { mazeWalls, characters, strokeCellsArray, potentialStrokeArray, wordMazeData } = result;
 
   return (
     <svg width={width} height={height} style={{ position: 'relative', zIndex: 1 }}>
@@ -477,7 +498,7 @@ const SvgGrid = ({ width, height, text, showFrames }) => {
         />
       ))}
 
-      {/* 2. Debug: show potential stroke in yellow, connected stroke in red */}
+      {/* 2. Debug: show stroke cells */}
       {showFrames && potentialStrokeArray.map(({ x, y }, i) => (
         <rect
           key={`potential-${i}`}
@@ -499,7 +520,48 @@ const SvgGrid = ({ width, height, text, showFrames }) => {
         />
       ))}
 
-      {/* 3. Render the character debug frames and walls (only in debug mode) */}
+      {/* 3. Word maze: render start/end markers and entry/exit points */}
+      {wordMazeData && wordMazeData.startCell && (
+        <rect
+          x={wordMazeData.startCell.x * UNIT_SIZE + 2}
+          y={wordMazeData.startCell.y * UNIT_SIZE + 2}
+          width={UNIT_SIZE - 4}
+          height={UNIT_SIZE - 4}
+          fill="rgba(0, 180, 0, 0.6)"
+          rx="2"
+        />
+      )}
+      {wordMazeData && wordMazeData.endCell && (
+        <rect
+          x={wordMazeData.endCell.x * UNIT_SIZE + 2}
+          y={wordMazeData.endCell.y * UNIT_SIZE + 2}
+          width={UNIT_SIZE - 4}
+          height={UNIT_SIZE - 4}
+          fill="rgba(220, 0, 0, 0.6)"
+          rx="2"
+        />
+      )}
+
+      {/* 4. Word maze debug: show entry/exit pairs */}
+      {showFrames && wordMazeData && wordMazeData.entryExitPairs && wordMazeData.entryExitPairs.map((pair, i) => {
+        if (!pair) return null;
+        return (
+          <g key={`ee-${i}`}>
+            <rect
+              x={pair.entry.x * UNIT_SIZE + 1} y={pair.entry.y * UNIT_SIZE + 1}
+              width={UNIT_SIZE - 2} height={UNIT_SIZE - 2}
+              fill="rgba(0, 100, 255, 0.4)" stroke="blue" strokeWidth="1"
+            />
+            <rect
+              x={pair.exit.x * UNIT_SIZE + 1} y={pair.exit.y * UNIT_SIZE + 1}
+              width={UNIT_SIZE - 2} height={UNIT_SIZE - 2}
+              fill="rgba(255, 100, 0, 0.4)" stroke="orange" strokeWidth="1"
+            />
+          </g>
+        );
+      })}
+
+      {/* 5. Render character debug frames and walls (debug mode) */}
       {showFrames && characters.map(({ char, x, y }, index) => {
         const charData = fontData[char.toUpperCase()];
         const xPos = x * UNIT_SIZE;

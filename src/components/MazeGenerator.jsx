@@ -6,7 +6,8 @@ import './MazeGenerator.css';
 const MazeGenerator = () => {
   const [text, setText] = useState('Hello');
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
-  const [showFrames, setShowFrames] = useState(false); // New state for debug frames
+  const [showFrames, setShowFrames] = useState(false);
+  const [wordMazeMode, setWordMazeMode] = useState(false);
   const gridRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -44,6 +45,10 @@ const MazeGenerator = () => {
     setShowFrames(prev => !prev);
   };
 
+  const toggleWordMazeMode = () => {
+    setWordMazeMode(prev => !prev);
+  };
+
   return (
     <div className="maze-generator">
       <div className="input-container">
@@ -56,10 +61,10 @@ const MazeGenerator = () => {
         <div className="character-counter">
           {text.length} / {maxCharacters}
         </div>
-        <DebugMenu showFrames={showFrames} toggleShowFrames={toggleShowFrames} /> {/* DebugMenu here */}
+        <DebugMenu showFrames={showFrames} toggleShowFrames={toggleShowFrames} wordMazeMode={wordMazeMode} toggleWordMazeMode={toggleWordMazeMode} />
       </div>
       <div className="grid-container" ref={gridRef}>
-        <SvgGrid width={gridSize.width} height={gridSize.height} text={text} showFrames={showFrames} />
+        <SvgGrid width={gridSize.width} height={gridSize.height} text={text} showFrames={showFrames} wordMazeMode={wordMazeMode} />
       </div>
     </div>
   );

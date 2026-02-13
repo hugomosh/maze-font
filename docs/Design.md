@@ -57,3 +57,5 @@ Users should be able to export the generated maze (both unsolved and with the so
 -   **Hand-Drawn Effect:** How will the "xkcd" aesthetic be implemented? (e.g., using a library like `rough.js`, applying SVG filters, or using shaders?)
 -   **Maze Algorithm:** What algorithm will be used for generating the filler maze? (e.g., Recursive Backtracking, Prim's Algorithm?)
 -   **Font Storage Format:** The font will be save in JSON. We should try to make it propertary. I would like to save it as an actual font.
+-   
+                                                                                                                               
