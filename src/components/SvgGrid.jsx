@@ -520,27 +520,18 @@ const SvgGrid = ({ width, height, text, showFrames, wordMazeMode }) => {
         />
       ))}
 
-      {/* 3. Word maze: render start/end markers and entry/exit points */}
-      {wordMazeData && wordMazeData.startCell && (
+      {/* 3. Word maze: render solution path */}
+      {wordMazeData && wordMazeData.solutionPath && wordMazeData.solutionPath.map(({ x, y }, i) => (
         <rect
-          x={wordMazeData.startCell.x * UNIT_SIZE + 2}
-          y={wordMazeData.startCell.y * UNIT_SIZE + 2}
+          key={`sol-${i}`}
+          x={x * UNIT_SIZE + 2}
+          y={y * UNIT_SIZE + 2}
           width={UNIT_SIZE - 4}
           height={UNIT_SIZE - 4}
-          fill="rgba(0, 180, 0, 0.6)"
+          fill={i === 0 ? "rgba(0, 180, 0, 0.6)" : i === wordMazeData.solutionPath.length - 1 ? "rgba(220, 0, 0, 0.6)" : "rgba(100, 100, 255, 0.25)"}
           rx="2"
         />
-      )}
-      {wordMazeData && wordMazeData.endCell && (
-        <rect
-          x={wordMazeData.endCell.x * UNIT_SIZE + 2}
-          y={wordMazeData.endCell.y * UNIT_SIZE + 2}
-          width={UNIT_SIZE - 4}
-          height={UNIT_SIZE - 4}
-          fill="rgba(220, 0, 0, 0.6)"
-          rx="2"
-        />
-      )}
+      ))}
 
       {/* 4. Word maze debug: show entry/exit pairs */}
       {showFrames && wordMazeData && wordMazeData.entryExitPairs && wordMazeData.entryExitPairs.map((pair, i) => {
