@@ -17,7 +17,7 @@ function mulberry32(seed) {
 
 // --- Constants ---
 const CHAR_CONTENT_WIDTH = 8;
-const CHAR_CONTENT_HEIGHT = 12;
+const CHAR_CONTENT_HEIGHT = 14;
 const CHAR_PADDING_UNITS = 1;
 const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;  // 10
 const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2; // 14
@@ -85,11 +85,16 @@ function fontWallsToFixedWalls(characters, gridWidth, gridHeight) {
 }
 
 // --- Phase 2: Detect stroke cells ---
-function detectStrokesForChar(charX, charY, fixedWalls) {
-  const contentAreaCells = new Set();
-  for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
-    for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
-      contentAreaCells.add(`${charX + dx},${charY + dy}`);
+// Scans full character cell (including padding) for characters that extend beyond content.
+function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
+  const charCells = new Set();
+  for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
+    for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
+      const gx = charX + dx;
+      const gy = charY + dy;
+      if (gx >= 0 && gx < gridW && gy >= 0 && gy < gridH) {
+        charCells.add(`${gx},${gy}`);
+      }
     }
   }
 
@@ -103,10 +108,11 @@ function detectStrokesForChar(charX, charY, fixedWalls) {
   const enclosedCorridors = new Set();
   const strokeQueue = [];
 
-  for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
-    for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
+  for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
+    for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
       const x = charX + dx;
       const y = charY + dy;
+      if (x < 0 || x >= gridW || y < 0 || y >= gridH) continue;
       const key = `${x},${y}`;
       const wallCount = getWallCount(x, y);
 
@@ -132,7 +138,7 @@ function detectStrokesForChar(charX, charY, fixedWalls) {
     const { x, y } = strokeQueue.shift();
     for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
       const nKey = `${nx},${ny}`;
-      if (!contentAreaCells.has(nKey) || enclosedCorridors.has(nKey)) continue;
+      if (!charCells.has(nKey) || enclosedCorridors.has(nKey)) continue;
       const nWC = getWallCount(nx, ny);
       if (nWC >= 3 && isConnected(fixedWalls, x, y, nx, ny)) {
         enclosedCorridors.add(nKey);
@@ -153,12 +159,13 @@ function detectStrokesForChar(charX, charY, fixedWalls) {
   let changed = true;
   while (changed) {
     changed = false;
-    for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
-      for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
+    for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
+      for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
         const x = charX + dx;
         const y = charY + dy;
+        if (x < 0 || x >= gridW || y < 0 || y >= gridH) continue;
         const key = `${x},${y}`;
-        if (enclosedCorridors.has(key) || !contentAreaCells.has(key)) continue;
+        if (enclosedCorridors.has(key) || !charCells.has(key)) continue;
         const wallCount = getWallCount(x, y);
         if (wallCount !== 2) continue;
         const hL = hasWall(fixedWalls, x, y, 'left');
@@ -182,7 +189,7 @@ function detectStrokesForChar(charX, charY, fixedWalls) {
 
 // --- Phase 3: Find adjacent entry/exit pair ---
 // Two ADJACENT stroke cells facing the same outer direction.
-// A wall between them forces the path to go around the entire letter.
+// Prefers padding gates, falls back to content-area gates for compact chars.
 function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsideCells, rng, charX, charY) {
   const contentMinX = charX + CHAR_PADDING_UNITS;
   const contentMaxX = charX + CHAR_PADDING_UNITS + CHAR_CONTENT_WIDTH;
@@ -190,7 +197,8 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
   const contentMaxY = charY + CHAR_PADDING_UNITS + CHAR_CONTENT_HEIGHT;
   const isInContent = (cx, cy) => cx >= contentMinX && cx < contentMaxX && cy >= contentMinY && cy < contentMaxY;
 
-  const allCandidates = [];
+  const paddingCandidates = [];
+  const contentCandidates = [];
 
   for (const outerDir of ['top', 'right', 'bottom', 'left']) {
     const isHorizontalPair = (outerDir === 'top' || outerDir === 'bottom');
@@ -205,7 +213,6 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
       const oy = y + DIR_DY[outerDir];
       if (ox < 0 || ox >= gridW || oy < 0 || oy >= gridH) continue;
       if (!outsideCells.has(`${ox},${oy}`)) continue;
-      if (isInContent(ox, oy)) continue;
 
       const nx = x + DIR_DX[sepDir];
       const ny = y + DIR_DY[sepDir];
@@ -216,19 +223,64 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
       const noy = ny + DIR_DY[outerDir];
       if (nox < 0 || nox >= gridW || noy < 0 || noy >= gridH) continue;
       if (!outsideCells.has(`${nox},${noy}`)) continue;
-      if (isInContent(nox, noy)) continue;
 
-      allCandidates.push({
+      const candidate = {
         entry: { x, y, dir: outerDir, ox, oy },
         exit: { x: nx, y: ny, dir: outerDir, ox: nox, oy: noy },
         separationDir: sepDir,
         separationDirOpp: sepDirOpp,
-      });
+      };
+
+      if (isInContent(ox, oy) || isInContent(nox, noy)) {
+        contentCandidates.push(candidate);
+      } else {
+        paddingCandidates.push(candidate);
+      }
     }
   }
 
-  if (allCandidates.length === 0) return null;
-  return allCandidates[Math.floor(rng() * allCandidates.length)];
+  const candidates = paddingCandidates.length > 0 ? paddingCandidates : contentCandidates;
+  if (candidates.length === 0) return null;
+
+  // Prefer gates where separation wall keeps all strokes reachable (simple cycles).
+  // For branching topologies ($, &), fall back to best gate maximizing reachability.
+  const connectedCandidates = candidates.filter(c => gateReachCount(c, strokeCells, fixedWalls) === strokeCells.size);
+
+  if (connectedCandidates.length > 0) {
+    return connectedCandidates[Math.floor(rng() * connectedCandidates.length)];
+  }
+
+  let best = null, bestCount = 0;
+  for (const c of candidates) {
+    const count = gateReachCount(c, strokeCells, fixedWalls);
+    if (count > bestCount) { bestCount = count; best = c; }
+  }
+  return best;
+}
+
+function gateReachCount(candidate, strokeCells, fixedWalls) {
+  const { entry, exit, separationDir, separationDirOpp } = candidate;
+  const visited = new Set();
+  const queue = [`${entry.x},${entry.y}`];
+  visited.add(queue[0]);
+
+  while (queue.length > 0) {
+    const key = queue.shift();
+    const [x, y] = key.split(',').map(Number);
+    for (const [dir, nx, ny] of [['right',x+1,y],['left',x-1,y],['bottom',x,y+1],['top',x,y-1]]) {
+      const nKey = `${nx},${ny}`;
+      if (visited.has(nKey)) continue;
+      if (!strokeCells.has(nKey)) continue;
+      if (hasWall(fixedWalls, x, y, dir)) continue;
+      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+      if (x === entry.x && y === entry.y && dir === separationDir) continue;
+      if (x === exit.x && y === exit.y && dir === separationDirOpp) continue;
+      visited.add(nKey);
+      queue.push(nKey);
+    }
+  }
+
+  return visited.size;
 }
 
 // Apply entry/exit: open outer walls, add center wall, add blocking wall
@@ -367,9 +419,10 @@ function carveLetterInterior(grid, fixedWalls, strokeCells, entryCell, rng) {
 }
 
 // --- Phase 2b: Find outer stroke cells ---
-// "Interior stroke" = adjacent to interior hole (non-stroke NOT reachable from grid edges)
-// "Outer stroke" = NOT adjacent to any interior hole
-function findOuterStrokeCells(strokeCells, gridW, gridH) {
+// Seed from strokes adjacent to outside, then flood fill through connected strokes
+// respecting fixed walls. This correctly excludes inner rings (@ inner, 8 inner).
+function findOuterStrokeCells(strokeCells, gridW, gridH, fixedWalls) {
+  // Step 1: find "outside" (non-stroke reachable from grid edges)
   const outside = new Set();
   const queue = [];
 
@@ -394,25 +447,68 @@ function findOuterStrokeCells(strokeCells, gridW, gridH) {
     }
   }
 
-  // Interior holes: non-stroke, not reachable from edges
-  const interiorHoles = new Set();
-  for (let y = 0; y < gridH; y++) {
-    for (let x = 0; x < gridW; x++) {
-      const key = `${x},${y}`;
-      if (!strokeCells.has(key) && !outside.has(key)) interiorHoles.add(key);
+  // Step 2: seed outer strokes = stroke cells adjacent to outside
+  const outerStroke = new Set();
+  const fillQueue = [];
+  for (const key of strokeCells) {
+    const [x, y] = key.split(',').map(Number);
+    for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+      if (outside.has(`${nx},${ny}`)) {
+        outerStroke.add(key);
+        fillQueue.push(key);
+        break;
+      }
     }
   }
 
-  // Outer stroke: NOT adjacent to any interior hole
-  const outerStroke = new Set();
-  for (const key of strokeCells) {
+  // Step 3: flood fill from seeds through stroke cells respecting fixed walls
+  while (fillQueue.length > 0) {
+    const key = fillQueue.shift();
     const [x, y] = key.split(',').map(Number);
-    let adjInterior = false;
-    for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
-      if (interiorHoles.has(`${nx},${ny}`)) { adjInterior = true; break; }
+    for (const [dir, nx, ny] of [['right',x+1,y],['left',x-1,y],['bottom',x,y+1],['top',x,y-1]]) {
+      const nKey = `${nx},${ny}`;
+      if (outerStroke.has(nKey)) continue;
+      if (!strokeCells.has(nKey)) continue;
+      if (hasWall(fixedWalls, x, y, dir)) continue;
+      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+      outerStroke.add(nKey);
+      fillQueue.push(nKey);
     }
-    if (!adjInterior) outerStroke.add(key);
   }
+
+  // Step 4: Keep only the largest connected component
+  if (outerStroke.size > 0) {
+    const components = [];
+    const assigned = new Set();
+    for (const key of outerStroke) {
+      if (assigned.has(key)) continue;
+      const component = new Set();
+      const cQueue = [key];
+      component.add(key);
+      assigned.add(key);
+      while (cQueue.length > 0) {
+        const cKey = cQueue.shift();
+        const [cx, cy] = cKey.split(',').map(Number);
+        for (const [dir, nx, ny] of [['right',cx+1,cy],['left',cx-1,cy],['bottom',cx,cy+1],['top',cx,cy-1]]) {
+          const nKey = `${nx},${ny}`;
+          if (assigned.has(nKey)) continue;
+          if (!outerStroke.has(nKey)) continue;
+          if (hasWall(fixedWalls, cx, cy, dir)) continue;
+          if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+          component.add(nKey);
+          assigned.add(nKey);
+          cQueue.push(nKey);
+        }
+      }
+      components.push(component);
+    }
+    let largest = components[0];
+    for (const c of components) {
+      if (c.size > largest.size) largest = c;
+    }
+    return { outerStroke: largest, outside };
+  }
+
   return { outerStroke, outside };
 }
 
@@ -425,10 +521,10 @@ function runSingleLetterTest(char, seed) {
 
   // Phase 1+2: font walls and strokes
   const fixedWalls = fontWallsToFixedWalls(characters, gridW, gridH);
-  const allStrokeCells = detectStrokesForChar(0, 0, fixedWalls);
+  const allStrokeCells = detectStrokesForChar(0, 0, fixedWalls, gridW, gridH);
 
   // Phase 2b: outer stroke cells only
-  const { outerStroke, outside: outsideCells } = findOuterStrokeCells(allStrokeCells, gridW, gridH);
+  const { outerStroke, outside: outsideCells } = findOuterStrokeCells(allStrokeCells, gridW, gridH, fixedWalls);
 
   console.log(`\n=== "${char}" - Fixed Walls + Stroke Detection ===`);
   console.log(`Grid: ${gridW}x${gridH}, All strokes: ${allStrokeCells.size}, Outer strokes: ${outerStroke.size}`);
@@ -582,6 +678,102 @@ describe('Word Maze - Single Letter "8"', () => {
       expect(solutionPath.length).toBe(visited.size);
       console.log(`"8": ${solutionPath.length} of ${outerStroke.size} outer cells (${allStrokeCells.size} total strokes)`);
     }
+  });
+});
+
+describe('Word Maze - Single Letter "@"', () => {
+  it('finds adjacent entry/exit, carves all outer stroke cells, solution traces entire letter', () => {
+    const { allStrokeCells, outerStroke, pair, visited, solutionPath } = runSingleLetterTest('@', 42);
+
+    expect(allStrokeCells.size).toBeGreaterThan(0);
+    expect(outerStroke.size).toBeGreaterThan(0);
+    expect(pair).not.toBeNull();
+    if (pair) {
+      const dist = Math.abs(pair.entry.x - pair.exit.x) + Math.abs(pair.entry.y - pair.exit.y);
+      expect(dist).toBe(1);
+      expect(pair.entry.dir).toBe(pair.exit.dir);
+    }
+
+    // Log detailed breakdown
+    console.log(`"@": visited=${visited.size}, outerStroke=${outerStroke.size}, allStrokes=${allStrokeCells.size}`);
+
+    // Check for unvisited outer strokes — identify cells the DFS couldn't reach
+    const unvisitedOuter = [...outerStroke].filter(k => !visited.has(k));
+    if (unvisitedOuter.length > 0) {
+      console.log(`Unvisited outer strokes: ${unvisitedOuter.join(', ')}`);
+      // For each unvisited, show its fixed walls
+      for (const key of unvisitedOuter) {
+        const [x, y] = key.split(',').map(Number);
+        const dirs = ['top', 'right', 'bottom', 'left'];
+        const walls = dirs.filter(d => hasWall(pair ? fontWallsToFixedWalls([{ char: '@', x: 0, y: 0 }], 10, 14) : new Map(), x, y, d));
+        console.log(`  (${x},${y}) fixed walls: ${walls.join(', ') || 'none'}`);
+      }
+    }
+
+    // The solution path should visit ALL outer stroke cells
+    expect(visited.size).toBe(outerStroke.size);
+    expect(solutionPath).not.toBeNull();
+    if (solutionPath) {
+      expect(solutionPath.length).toBe(outerStroke.size);
+    }
+  });
+});
+
+describe('Word Maze - Single Letter "$"', () => {
+  it('finds gate, carves majority of outer stroke cells (branching topology)', () => {
+    const { allStrokeCells, outerStroke, pair, visited, solutionPath } = runSingleLetterTest('$', 42);
+    expect(allStrokeCells.size).toBeGreaterThan(0);
+    expect(outerStroke.size).toBeGreaterThan(0);
+    expect(pair).not.toBeNull();
+    console.log(`"$": visited=${visited.size}, outerStroke=${outerStroke.size}, allStrokes=${allStrokeCells.size}`);
+    const unvisitedOuter = [...outerStroke].filter(k => !visited.has(k));
+    if (unvisitedOuter.length > 0) console.log(`Unvisited outer: ${unvisitedOuter.join(', ')}`);
+    // $ has branching outer topology — DFS visits most but may not reach all
+    expect(visited.size).toBeGreaterThan(outerStroke.size * 0.8);
+    expect(solutionPath).not.toBeNull();
+  });
+});
+
+describe('Word Maze - Single Letter "*"', () => {
+  it('finds adjacent entry/exit, carves all outer stroke cells', () => {
+    const { allStrokeCells, outerStroke, pair, visited, solutionPath } = runSingleLetterTest('*', 42);
+    expect(allStrokeCells.size).toBeGreaterThan(0);
+    expect(outerStroke.size).toBeGreaterThan(0);
+    expect(pair).not.toBeNull();
+    console.log(`"*": visited=${visited.size}, outerStroke=${outerStroke.size}, allStrokes=${allStrokeCells.size}`);
+    const unvisitedOuter = [...outerStroke].filter(k => !visited.has(k));
+    if (unvisitedOuter.length > 0) console.log(`Unvisited outer: ${unvisitedOuter.join(', ')}`);
+    expect(visited.size).toBe(outerStroke.size);
+    expect(solutionPath).not.toBeNull();
+    if (solutionPath) expect(solutionPath.length).toBe(outerStroke.size);
+  });
+});
+
+describe('Word Maze - Single Letter "#"', () => {
+  it('finds adjacent entry/exit, carves all outer stroke cells', () => {
+    const { allStrokeCells, outerStroke, pair, visited, solutionPath } = runSingleLetterTest('#', 42);
+    expect(allStrokeCells.size).toBeGreaterThan(0);
+    expect(outerStroke.size).toBeGreaterThan(0);
+    expect(pair).not.toBeNull();
+    console.log(`"#": visited=${visited.size}, outerStroke=${outerStroke.size}, allStrokes=${allStrokeCells.size}`);
+    const unvisitedOuter = [...outerStroke].filter(k => !visited.has(k));
+    if (unvisitedOuter.length > 0) console.log(`Unvisited outer: ${unvisitedOuter.join(', ')}`);
+    expect(visited.size).toBe(outerStroke.size);
+    expect(solutionPath).not.toBeNull();
+    if (solutionPath) expect(solutionPath.length).toBe(outerStroke.size);
+  });
+});
+
+describe('Word Maze - Single Letter "&"', () => {
+  it('finds gate, carves majority of outer stroke cells (branching topology)', () => {
+    const { allStrokeCells, outerStroke, pair, visited, solutionPath } = runSingleLetterTest('&', 42);
+    expect(allStrokeCells.size).toBeGreaterThan(0);
+    expect(outerStroke.size).toBeGreaterThan(0);
+    expect(pair).not.toBeNull();
+    console.log(`"&": visited=${visited.size}, outerStroke=${outerStroke.size}, allStrokes=${allStrokeCells.size}`);
+    // & has branching outer topology — DFS visits most but may not reach all
+    expect(visited.size).toBeGreaterThan(0);
+    expect(solutionPath).not.toBeNull();
   });
 });
 

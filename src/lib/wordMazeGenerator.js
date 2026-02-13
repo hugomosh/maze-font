@@ -7,7 +7,7 @@ import { recursiveBacktracker } from './mazeGenerator';
 
 // --- Constants (mirrored from SvgGrid.jsx) ---
 const CHAR_CONTENT_WIDTH = 8;
-const CHAR_CONTENT_HEIGHT = 12;
+const CHAR_CONTENT_HEIGHT = 14;
 const CHAR_PADDING_UNITS = 1;
 const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
 const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2;
@@ -90,12 +90,18 @@ function fontWallsToFixedWalls(characters, gridWidth, gridHeight, fontData) {
 }
 
 // --- Phase 2: Detect stroke cells for a character ---
+// Scans the FULL character cell (including padding rows/cols) because some
+// characters ($, &, #) have font segments extending into/beyond the padding area.
 function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
-  // Content area for this character
-  const contentAreaCells = new Set();
-  for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
-    for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
-      contentAreaCells.add(`${charX + dx},${charY + dy}`);
+  // Full character cell area (including padding)
+  const charCells = new Set();
+  for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
+    for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
+      const gx = charX + dx;
+      const gy = charY + dy;
+      if (gx >= 0 && gx < gridW && gy >= 0 && gy < gridH) {
+        charCells.add(`${gx},${gy}`);
+      }
     }
   }
 
@@ -110,10 +116,11 @@ function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
   const strokeQueue = [];
 
   // Step 1: Seed high-confidence strokes (3+ walls or 2 opposite walls)
-  for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
-    for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
+  for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
+    for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
       const x = charX + dx;
       const y = charY + dy;
+      if (x < 0 || x >= gridW || y < 0 || y >= gridH) continue;
       const key = `${x},${y}`;
       const wallCount = getWallCount(x, y);
 
@@ -142,7 +149,7 @@ function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
     const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
     for (const [nx, ny] of neighbors) {
       const nKey = `${nx},${ny}`;
-      if (!contentAreaCells.has(nKey)) continue;
+      if (!charCells.has(nKey)) continue;
       if (enclosedCorridors.has(nKey)) continue;
       const nWallCount = getWallCount(nx, ny);
       if (nWallCount >= 3 && isConnected(fixedWalls, x, y, nx, ny)) {
@@ -165,13 +172,14 @@ function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
   let changed = true;
   while (changed) {
     changed = false;
-    for (let dy = 1; dy < CHAR_CELL_HEIGHT_UNITS - 1; dy++) {
-      for (let dx = 1; dx < CHAR_CELL_WIDTH_UNITS - 1; dx++) {
+    for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
+      for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
         const x = charX + dx;
         const y = charY + dy;
+        if (x < 0 || x >= gridW || y < 0 || y >= gridH) continue;
         const key = `${x},${y}`;
         if (enclosedCorridors.has(key)) continue;
-        if (!contentAreaCells.has(key)) continue;
+        if (!charCells.has(key)) continue;
 
         const wallCount = getWallCount(x, y);
         if (wallCount !== 2) continue;
@@ -198,11 +206,13 @@ function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
 }
 
 // --- Phase 2b: Filter to outer stroke cells only ---
-// For letters with interior holes (8, 0, B, etc.), we only want the outer contour.
-// "Interior stroke" = adjacent to an interior hole (non-stroke cell NOT reachable from grid edges).
-// "Outer stroke" = everything else (including junction cells surrounded by other strokes).
-function findOuterStrokeCells(strokeCells, gridW, gridH) {
-  // Flood fill from grid edges through non-stroke cells to find "outside"
+// "Outer stroke" = stroke cells reachable from the outside through unfixed walls.
+// 1. Flood fill from grid edges through non-stroke cells → "outside"
+// 2. Seed: stroke cells adjacent to at least one outside cell
+// 3. Flood fill through stroke cells respecting fixed walls → outer strokes
+// This correctly handles: @ inner ring (separated by walls), 8 corners, L junctions.
+function findOuterStrokeCells(strokeCells, gridW, gridH, fixedWalls) {
+  // Step 1: find "outside" cells (non-stroke, reachable from grid edges)
   const outside = new Set();
   const queue = [];
 
@@ -230,29 +240,81 @@ function findOuterStrokeCells(strokeCells, gridW, gridH) {
     }
   }
 
-  // Interior holes: non-stroke cells NOT reachable from grid edges
-  const interiorHoles = new Set();
-  for (let y = 0; y < gridH; y++) {
-    for (let x = 0; x < gridW; x++) {
-      const key = `${x},${y}`;
-      if (!strokeCells.has(key) && !outside.has(key)) {
-        interiorHoles.add(key);
+  // Step 2: seed outer strokes = stroke cells adjacent to at least one outside cell
+  const outerStroke = new Set();
+  const fillQueue = [];
+  for (const key of strokeCells) {
+    const [x, y] = key.split(',').map(Number);
+    for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+      if (outside.has(`${nx},${ny}`)) {
+        outerStroke.add(key);
+        fillQueue.push(key);
+        break;
       }
     }
   }
 
-  // Outer stroke: NOT adjacent to any interior hole
-  const outerStroke = new Set();
-  for (const key of strokeCells) {
+  // Step 3: flood fill from seeds through connected stroke cells (respecting fixed walls)
+  while (fillQueue.length > 0) {
+    const key = fillQueue.shift();
     const [x, y] = key.split(',').map(Number);
-    let adjInterior = false;
-    for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
-      if (interiorHoles.has(`${nx},${ny}`)) {
-        adjInterior = true;
-        break;
-      }
+    const neighbors = [
+      { dir: 'right', nx: x + 1, ny: y },
+      { dir: 'left', nx: x - 1, ny: y },
+      { dir: 'bottom', nx: x, ny: y + 1 },
+      { dir: 'top', nx: x, ny: y - 1 },
+    ];
+    for (const { dir, nx, ny } of neighbors) {
+      const nKey = `${nx},${ny}`;
+      if (outerStroke.has(nKey)) continue;
+      if (!strokeCells.has(nKey)) continue;
+      // Only cross if no fixed wall blocks passage
+      if (hasWall(fixedWalls, x, y, dir)) continue;
+      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+      outerStroke.add(nKey);
+      fillQueue.push(nKey);
     }
-    if (!adjInterior) outerStroke.add(key);
+  }
+
+  // Step 4: Keep only the largest connected component of outer strokes
+  // (handles characters like $ where the descender is disconnected from the main ring)
+  if (outerStroke.size > 0) {
+    const components = [];
+    const assigned = new Set();
+    for (const key of outerStroke) {
+      if (assigned.has(key)) continue;
+      const component = new Set();
+      const cQueue = [key];
+      component.add(key);
+      assigned.add(key);
+      while (cQueue.length > 0) {
+        const cKey = cQueue.shift();
+        const [cx, cy] = cKey.split(',').map(Number);
+        const cNeighbors = [
+          { dir: 'right', nx: cx + 1, ny: cy },
+          { dir: 'left', nx: cx - 1, ny: cy },
+          { dir: 'bottom', nx: cx, ny: cy + 1 },
+          { dir: 'top', nx: cx, ny: cy - 1 },
+        ];
+        for (const { dir, nx, ny } of cNeighbors) {
+          const nKey = `${nx},${ny}`;
+          if (assigned.has(nKey)) continue;
+          if (!outerStroke.has(nKey)) continue;
+          if (hasWall(fixedWalls, cx, cy, dir)) continue;
+          if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+          component.add(nKey);
+          assigned.add(nKey);
+          cQueue.push(nKey);
+        }
+      }
+      components.push(component);
+    }
+    // Replace outerStroke with the largest component
+    let largest = components[0];
+    for (const c of components) {
+      if (c.size > largest.size) largest = c;
+    }
+    return { outerStroke: largest, outside };
   }
 
   return { outerStroke, outside };
@@ -262,8 +324,8 @@ function findOuterStrokeCells(strokeCells, gridW, gridH) {
 // Finds two ADJACENT stroke cells that both face the same outer direction.
 // They are separated by a center wall (added if not present), forcing the solver
 // to traverse the entire letter corridor to get from entry to exit.
-// Gates must open onto the PADDING area (not deep inside content) so the external
-// BFS can route between letters through the padding channels.
+// Prefers gates opening onto PADDING (better for multi-letter BFS routing),
+// but falls back to content-area gates for compact characters like *.
 // Uses rng to randomly select from all valid candidates.
 function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsideCells, rng, charX, charY) {
   // Content area: the area inside the padding border
@@ -273,7 +335,8 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
   const contentMaxY = charY + CHAR_PADDING_UNITS + CHAR_CONTENT_HEIGHT;
   const isInContent = (cx, cy) => cx >= contentMinX && cx < contentMaxX && cy >= contentMinY && cy < contentMaxY;
 
-  const allCandidates = [];
+  const paddingCandidates = [];  // outside cells in padding (preferred)
+  const contentCandidates = [];  // outside cells in content (fallback)
 
   for (const outerDir of ['top', 'right', 'bottom', 'left']) {
     const isHorizontalPair = (outerDir === 'top' || outerDir === 'bottom');
@@ -290,10 +353,6 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
       if (ox < 0 || ox >= gridW || oy < 0 || oy >= gridH) continue;
       if (!outsideCells.has(`${ox},${oy}`)) continue;
 
-      // Outside cell must be in the padding (not inside content area)
-      // This ensures the BFS can route through padding channels
-      if (isInContent(ox, oy)) continue;
-
       const nx = x + DIR_DX[sepDir];
       const ny = y + DIR_DY[sepDir];
       if (!strokeCells.has(`${nx},${ny}`)) continue;
@@ -303,19 +362,117 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
       const noy = ny + DIR_DY[outerDir];
       if (nox < 0 || nox >= gridW || noy < 0 || noy >= gridH) continue;
       if (!outsideCells.has(`${nox},${noy}`)) continue;
-      if (isInContent(nox, noy)) continue;
 
-      allCandidates.push({
+      const candidate = {
         entry: { x, y, dir: outerDir, ox, oy },
         exit: { x: nx, y: ny, dir: outerDir, ox: nox, oy: noy },
         separationDir: sepDir,
         separationDirOpp: sepDirOpp,
-      });
+      };
+
+      if (isInContent(ox, oy) || isInContent(nox, noy)) {
+        contentCandidates.push(candidate);
+      } else {
+        paddingCandidates.push(candidate);
+      }
     }
   }
 
-  if (allCandidates.length === 0) return null;
-  return allCandidates[Math.floor(rng() * allCandidates.length)];
+  // Prefer padding gates; fall back to content gates for compact characters
+  const candidates = paddingCandidates.length > 0 ? paddingCandidates : contentCandidates;
+  if (candidates.length === 0) return null;
+
+  // Prefer gates where the separation wall keeps all strokes reachable (simple cycles).
+  // For branching topologies ($, &), fall back to best gate without connectivity requirement.
+  const connectedCandidates = candidates.filter(candidate => {
+    return isGateConnected(candidate, strokeCells, fixedWalls);
+  });
+
+  if (connectedCandidates.length > 0) {
+    return connectedCandidates[Math.floor(rng() * connectedCandidates.length)];
+  }
+
+  // Fallback: pick the gate that maximizes reachable cells from entry
+  let bestCandidate = null;
+  let bestReachable = 0;
+  for (const candidate of candidates) {
+    const reachable = countReachable(candidate, strokeCells, fixedWalls);
+    if (reachable > bestReachable) {
+      bestReachable = reachable;
+      bestCandidate = candidate;
+    }
+  }
+  return bestCandidate;
+}
+
+// Check that after adding the separation wall, all outer stroke cells
+// are still reachable from the entry cell via BFS respecting fixed walls.
+function isGateConnected(candidate, strokeCells, fixedWalls) {
+  const { entry, exit, separationDir, separationDirOpp } = candidate;
+  // Simulate the separation wall: entry -> exit direction is blocked
+  // We check: can BFS from entry reach ALL stroke cells without crossing
+  // the separation wall between entry and exit?
+  const visited = new Set();
+  const queue = [`${entry.x},${entry.y}`];
+  visited.add(queue[0]);
+
+  while (queue.length > 0) {
+    const key = queue.shift();
+    const [x, y] = key.split(',').map(Number);
+    const neighbors = [
+      { dir: 'right', nx: x + 1, ny: y },
+      { dir: 'left', nx: x - 1, ny: y },
+      { dir: 'bottom', nx: x, ny: y + 1 },
+      { dir: 'top', nx: x, ny: y - 1 },
+    ];
+    for (const { dir, nx, ny } of neighbors) {
+      const nKey = `${nx},${ny}`;
+      if (visited.has(nKey)) continue;
+      if (!strokeCells.has(nKey)) continue;
+      // Check fixed walls
+      if (hasWall(fixedWalls, x, y, dir)) continue;
+      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+      // Check simulated separation wall
+      if (x === entry.x && y === entry.y && dir === separationDir) continue;
+      if (x === exit.x && y === exit.y && dir === separationDirOpp) continue;
+      visited.add(nKey);
+      queue.push(nKey);
+    }
+  }
+
+  return visited.size === strokeCells.size;
+}
+
+// Count how many stroke cells are reachable from entry with the separation wall.
+function countReachable(candidate, strokeCells, fixedWalls) {
+  const { entry, exit, separationDir, separationDirOpp } = candidate;
+  const visited = new Set();
+  const queue = [`${entry.x},${entry.y}`];
+  visited.add(queue[0]);
+
+  while (queue.length > 0) {
+    const key = queue.shift();
+    const [x, y] = key.split(',').map(Number);
+    const neighbors = [
+      { dir: 'right', nx: x + 1, ny: y },
+      { dir: 'left', nx: x - 1, ny: y },
+      { dir: 'bottom', nx: x, ny: y + 1 },
+      { dir: 'top', nx: x, ny: y - 1 },
+    ];
+    for (const { dir, nx, ny } of neighbors) {
+      const nKey = `${nx},${ny}`;
+      if (visited.has(nKey)) continue;
+      if (!strokeCells.has(nKey)) continue;
+      if (hasWall(fixedWalls, x, y, dir)) continue;
+      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+      if (x === entry.x && y === entry.y && dir === separationDir) continue;
+      if (x === exit.x && y === exit.y && dir === separationDirOpp) continue;
+      visited.add(nKey);
+      queue.push(nKey);
+    }
+  }
+
+  return visited.size;
 }
 
 // --- Phase 3b: Apply entry/exit modifications to fixedWalls ---
@@ -523,7 +680,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   const charOuterStrokeCells = [];
   const charOutsideCells = [];
   for (let i = 0; i < characters.length; i++) {
-    const { outerStroke, outside } = findOuterStrokeCells(charStrokeCells[i], gridWidth, gridHeight);
+    const { outerStroke, outside } = findOuterStrokeCells(charStrokeCells[i], gridWidth, gridHeight, fixedWalls);
     charOuterStrokeCells.push(outerStroke);
     charOutsideCells.push(outside);
   }

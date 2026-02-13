@@ -6,7 +6,7 @@ import { generateWordMaze } from '../lib/wordMazeGenerator';
 // --- CONSTANTS ---
 const UNIT_SIZE = 17;
 const CHAR_CONTENT_WIDTH = 8;
-const CHAR_CONTENT_HEIGHT = 12;
+const CHAR_CONTENT_HEIGHT = 14;
 const CHAR_PADDING_UNITS = 1;
 
 export const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
