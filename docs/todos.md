@@ -1,5 +1,5 @@
 - [ ] Focus on mobile optimization
-- [ ] Try to ignore/connect spaces
+- [x] Try to ignore/connect spaces
 - [ ] Fit maze in a square or rectangle with zig-zag line patterns
 - [ ] Design an attractive display method
 - [ ] Encourage maze solving with visual elements (stars or hearts)

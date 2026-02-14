@@ -3,8 +3,10 @@ import SvgGrid, { CHAR_CELL_WIDTH_UNITS, CHAR_CELL_HEIGHT_UNITS, UNIT_SIZE_EXPOR
 import './MazeGenerator.css';
 
 const MazeGenerator = () => {
-  const [text, setText] = useState('Hello');
+  const [text, setText] = useState('Jonathan');
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
+  const [showPath, setShowPath] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState('square'); // 'square' or 'story'
   const gridRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -21,16 +23,10 @@ const MazeGenerator = () => {
   }, []);
 
   const maxCharacters = useMemo(() => {
-    if (!gridSize.width || !gridSize.height) return 0;
-
-    const charCellWidthPx = CHAR_CELL_WIDTH_UNITS * UNIT_SIZE_EXPORT;
-    const charCellHeightPx = CHAR_CELL_HEIGHT_UNITS * UNIT_SIZE_EXPORT;
-
-    const charsPerGridRow = Math.floor(gridSize.width / charCellWidthPx);
-    const numGridRows = Math.floor(gridSize.height / charCellHeightPx);
-
-    return charsPerGridRow * numGridRows;
-  }, [gridSize.width, gridSize.height]);
+    // With dynamic sizing, we can be more generous with the character limit
+    // Set a reasonable max for names (most names fit in 15 characters)
+    return 20;
+  }, []);
 
   const handleInputChange = (event) => {
     if (event.target.value.length <= maxCharacters) {
@@ -50,9 +46,33 @@ const MazeGenerator = () => {
         <div className="character-counter">
           {text.length} / {maxCharacters}
         </div>
+        <label className="path-toggle">
+          <input
+            type="checkbox"
+            checked={showPath}
+            onChange={(e) => setShowPath(e.target.checked)}
+          />
+          <span>Show Path</span>
+        </label>
       </div>
-      <div className="grid-container" ref={gridRef}>
-        <SvgGrid width={gridSize.width} height={gridSize.height} text={text} />
+      <div className="format-selector">
+        <button
+          className={aspectRatio === 'square' ? 'active' : ''}
+          onClick={() => setAspectRatio('square')}
+        >
+          Square (Post)
+        </button>
+        <button
+          className={aspectRatio === 'story' ? 'active' : ''}
+          onClick={() => setAspectRatio('story')}
+        >
+          Story (9:16)
+        </button>
+      </div>
+      <div className="grid-container-wrapper">
+        <div className={`grid-container ${aspectRatio}`} ref={gridRef}>
+          <SvgGrid width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} />
+        </div>
       </div>
     </div>
   );

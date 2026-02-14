@@ -686,8 +686,15 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   }
 
   // Phase 3: Find entry/exit pairs using outer stroke cells, gates must face true outside
+  // Skip spaces - they don't have strokes or entry/exit pairs
   const entryExitPairs = [];
   for (let i = 0; i < characters.length; i++) {
+    // Skip spaces
+    if (characters[i].char === ' ') {
+      entryExitPairs.push(null);
+      continue;
+    }
+
     const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, gridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y);
     if (!pair) {
       entryExitPairs.push(null);
@@ -782,16 +789,28 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     grid[exit.oy][exit.ox].walls[separationDirOpp] = true;
   }
 
-  // Phase 5: Carve external paths between consecutive letters
+  // Phase 5: Carve external paths between consecutive non-space letters
+  // Skip spaces when connecting - connect letter to next non-space letter
   const externalPaths = [];
   for (let i = 0; i < characters.length - 1; i++) {
-    if (!entryExitPairs[i] || !entryExitPairs[i + 1]) {
+    if (!entryExitPairs[i]) {
+      externalPaths.push(null);
+      continue;
+    }
+
+    // Find next non-space letter
+    let nextLetterIdx = i + 1;
+    while (nextLetterIdx < characters.length && !entryExitPairs[nextLetterIdx]) {
+      nextLetterIdx++;
+    }
+
+    if (nextLetterIdx >= characters.length) {
       externalPaths.push(null);
       continue;
     }
 
     const exitPair = entryExitPairs[i].exit;
-    const entryPair = entryExitPairs[i + 1].entry;
+    const entryPair = entryExitPairs[nextLetterIdx].entry;
     const fromCell = { x: exitPair.ox, y: exitPair.oy };
     const toCell = { x: entryPair.ox, y: entryPair.oy };
 
@@ -801,6 +820,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
 
   // Build full solution path
   const solutionPath = [];
+  let pathIndex = 0;
   for (let i = 0; i < characters.length; i++) {
     if (!entryExitPairs[i]) continue;
     const pair = entryExitPairs[i];
@@ -813,10 +833,11 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     }
     // Outside exit cell
     solutionPath.push({ x: pair.exit.ox, y: pair.exit.oy });
-    // External path to next letter
-    if (i < externalPaths.length && externalPaths[i]) {
-      solutionPath.push(...externalPaths[i]);
+    // External path to next letter (use pathIndex to track external paths)
+    if (pathIndex < externalPaths.length && externalPaths[pathIndex]) {
+      solutionPath.push(...externalPaths[pathIndex]);
     }
+    pathIndex++;
   }
 
   // Phase 6: Fill remaining space with maze
