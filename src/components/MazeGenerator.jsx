@@ -1,13 +1,10 @@
 import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
 import SvgGrid, { CHAR_CELL_WIDTH_UNITS, CHAR_CELL_HEIGHT_UNITS, UNIT_SIZE_EXPORT } from './SvgGrid';
-import DebugMenu from './DebugMenu'; // Import the new DebugMenu
 import './MazeGenerator.css';
 
 const MazeGenerator = () => {
   const [text, setText] = useState('Hello');
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
-  const [showFrames, setShowFrames] = useState(false);
-  const [wordMazeMode, setWordMazeMode] = useState(false);
   const gridRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -41,14 +38,6 @@ const MazeGenerator = () => {
     }
   };
 
-  const toggleShowFrames = () => {
-    setShowFrames(prev => !prev);
-  };
-
-  const toggleWordMazeMode = () => {
-    setWordMazeMode(prev => !prev);
-  };
-
   return (
     <div className="maze-generator">
       <div className="input-container">
@@ -61,10 +50,9 @@ const MazeGenerator = () => {
         <div className="character-counter">
           {text.length} / {maxCharacters}
         </div>
-        <DebugMenu showFrames={showFrames} toggleShowFrames={toggleShowFrames} wordMazeMode={wordMazeMode} toggleWordMazeMode={toggleWordMazeMode} />
       </div>
       <div className="grid-container" ref={gridRef}>
-        <SvgGrid width={gridSize.width} height={gridSize.height} text={text} showFrames={showFrames} wordMazeMode={wordMazeMode} />
+        <SvgGrid width={gridSize.width} height={gridSize.height} text={text} />
       </div>
     </div>
   );
