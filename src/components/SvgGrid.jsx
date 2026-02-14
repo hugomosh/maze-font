@@ -86,12 +86,10 @@ const SvgGrid = ({ width, height, text, showPath }) => {
   const result = useMemo(() => {
     if (width === 0 || height === 0) return {
       glyphWalls: new Map(),
-      backgroundWalls: [],
+      mazeWalls: [],
       characters: [],
       solutionPath: [],
       unitSize: BASE_UNIT_SIZE,
-      offsetX: 0,
-      offsetY: 0,
     };
 
     // Calculate optimal unit size for the full area
@@ -102,13 +100,13 @@ const SvgGrid = ({ width, height, text, showPath }) => {
 
     const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData);
 
-    // Build a set of glyph walls (walls that come from fontData)
-    const glyphWalls = new Map(); // Map<charIndex, walls[]>
+    // Step 1: Build potential glyph walls from fontData
+    const potentialGlyphWalls = new Map(); // Map<charIndex, walls[]>
 
     wmResult.characters.forEach((charInfo, index) => {
       const charData = fontData[charInfo.char.toUpperCase()];
       if (!charData) {
-        glyphWalls.set(index, []);
+        potentialGlyphWalls.set(index, []);
         return;
       }
 
@@ -138,10 +136,20 @@ const SvgGrid = ({ width, height, text, showPath }) => {
           }
         }
       }
-      glyphWalls.set(index, walls);
+      potentialGlyphWalls.set(index, walls);
     });
 
-    // Create a set of glyph wall strings for fast lookup
+    // Step 2: Create a Set of all walls in final output
+    const finalWallSet = new Set(wmResult.walls.map(w => w.join(',')));
+
+    // Step 3: Filter glyph walls to only those that exist in final output
+    const glyphWalls = new Map();
+    for (const [charIndex, walls] of potentialGlyphWalls.entries()) {
+      const existingWalls = walls.filter(wall => finalWallSet.has(wall.join(',')));
+      glyphWalls.set(charIndex, existingWalls);
+    }
+
+    // Step 4: Create glyph wall set for filtering maze walls
     const glyphWallSet = new Set();
     for (const walls of glyphWalls.values()) {
       for (const wall of walls) {
@@ -149,37 +157,38 @@ const SvgGrid = ({ width, height, text, showPath }) => {
       }
     }
 
-    // Separate background walls (all walls that aren't glyph walls)
-    const backgroundWalls = wmResult.walls.filter(wall =>
-      !glyphWallSet.has(wall.join(','))
-    );
+    // Step 5: All non-glyph walls go to maze (gray)
+    const mazeWalls = wmResult.walls.filter(wall => !glyphWallSet.has(wall.join(',')));
 
     return {
       glyphWalls,
-      backgroundWalls,
+      mazeWalls,
       characters: wmResult.characters,
       solutionPath: wmResult.solutionPath || [],
       unitSize,
     };
   }, [width, height, text]);
 
-  const { glyphWalls, backgroundWalls, characters, solutionPath, unitSize } = result;
+  const { glyphWalls, mazeWalls, characters, solutionPath, unitSize } = result;
 
   return (
     <svg width={width} height={height} style={{ display: 'block' }}>
-      {/* Render background walls (subtle gray) */}
-      {backgroundWalls.map(([x1, y1, x2, y2], i) => (
+      {/* Background fill */}
+      <rect width={width} height={height} fill="#f5f5f5" />
+
+      {/* Render maze walls (everything except glyphs, varied grays) */}
+      {mazeWalls.map(([x1, y1, x2, y2], i) => (
         <line
-          key={`bg-${i}`}
+          key={`maze-${i}`}
           x1={x1 * unitSize} y1={y1 * unitSize}
           x2={x2 * unitSize} y2={y2 * unitSize}
-          stroke="#adb5bd"
-          strokeWidth="2"
+          stroke={BACKGROUND_COLORS[i % BACKGROUND_COLORS.length]}
+          strokeWidth={Math.max(3, unitSize * 0.25)}
           strokeLinecap="square"
         />
       ))}
 
-      {/* Render glyph walls (bold, colorful) */}
+      {/* Render filtered glyph walls (letter shapes only, excluding removed entry/exit) */}
       {Array.from(glyphWalls.entries()).map(([charIndex, walls]) => {
         const color = LETTER_COLORS[charIndex % LETTER_COLORS.length];
         return walls.map(([x1, y1, x2, y2], i) => (
@@ -188,7 +197,7 @@ const SvgGrid = ({ width, height, text, showPath }) => {
             x1={x1 * unitSize} y1={y1 * unitSize}
             x2={x2 * unitSize} y2={y2 * unitSize}
             stroke={color}
-            strokeWidth={Math.max(3, unitSize * 0.25)}
+            strokeWidth={Math.max(4, unitSize * 0.3)}
             strokeLinecap="round"
           />
         ));
