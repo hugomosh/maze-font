@@ -90,15 +90,21 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath }, ref) => {
       characters: [],
       solutionPath: [],
       unitSize: BASE_UNIT_SIZE,
+      cellConfig: null,
     };
 
-    // Calculate optimal unit size for the full area
-    const unitSize = calculateOptimalUnitSize(text, width, height);
-
-    const gridWidthUnits = Math.floor(width / unitSize);
-    const gridHeightUnits = Math.floor(height / unitSize);
+    // Start with a base unit size to get grid dimensions
+    const initialUnitSize = MIN_UNIT_SIZE;
+    const gridWidthUnits = Math.floor(width / initialUnitSize);
+    const gridHeightUnits = Math.floor(height / initialUnitSize);
 
     const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData);
+
+    // Calculate actual unit size based on the grid dimensions
+    // We want to fit the grid snugly in the available space
+    const unitSizeFromWidth = width / gridWidthUnits;
+    const unitSizeFromHeight = height / gridHeightUnits;
+    const unitSize = Math.min(unitSizeFromWidth, unitSizeFromHeight);
 
     // Step 1: Build potential glyph walls from fontData
     const potentialGlyphWalls = new Map(); // Map<charIndex, walls[]>
@@ -166,10 +172,11 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath }, ref) => {
       characters: wmResult.characters,
       solutionPath: wmResult.solutionPath || [],
       unitSize,
+      cellConfig: wmResult.cellConfig,
     };
   }, [width, height, text]);
 
-  const { glyphWalls, mazeWalls, characters, solutionPath, unitSize } = result;
+  const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig } = result;
 
   return (
     <svg ref={ref} width={width} height={height} style={{ display: 'block' }}>

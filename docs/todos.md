@@ -5,3 +5,5 @@
 - [ ] Encourage maze solving with visual elements (stars or hearts)
 - [ ] try different styles. Colored walls 
 - [ ] Try sidewinder or other to get a more vertical lines texture
+
+

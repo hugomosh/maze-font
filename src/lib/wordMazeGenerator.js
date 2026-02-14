@@ -41,19 +41,123 @@ const OPPOSITE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
 const DIR_DX = { top: 0, bottom: 0, left: -1, right: 1 };
 const DIR_DY = { top: -1, bottom: 1, left: 0, right: 0 };
 
-// --- Phase 1: Layout characters ---
-function layoutCharacters(text, gridWidthUnits, gridHeightUnits) {
+// --- Phase 1: Calculate optimal cell size and layout characters ---
+// Wraps text by words and scales cells to fit the longest line
+function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits) {
+  // Try with maximum of 2 rows
+  const MAX_ROWS = 2;
+  const words = text.split(' ');
+
+  // Calculate optimal cell width to fit longest line in grid width
+  let bestLayout = null;
+  let bestCellWidth = CHAR_CELL_WIDTH_UNITS;
+  let longestLineChars = 0;
+
+  // First, simulate layout to find longest line
   const charsPerGridRow = Math.floor(gridWidthUnits / CHAR_CELL_WIDTH_UNITS);
-  return text.split('').map((char, index) => {
-    const charCol = index % charsPerGridRow;
-    const charRow = Math.floor(index / charsPerGridRow);
-    const x = charCol * CHAR_CELL_WIDTH_UNITS;
-    const y = charRow * CHAR_CELL_HEIGHT_UNITS;
-    if ((x + CHAR_CELL_WIDTH_UNITS) > gridWidthUnits || (y + CHAR_CELL_HEIGHT_UNITS) > gridHeightUnits) {
+  const tempLayout = [];
+  let currentRow = 0;
+  let currentCol = 0;
+  let maxColInRow = 0;
+
+  for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+    const word = words[wordIdx];
+    const wordLength = word.length;
+
+    // Check if word fits on current row
+    if (currentCol > 0 && currentCol + wordLength > charsPerGridRow) {
+      maxColInRow = Math.max(maxColInRow, currentCol);
+      currentRow++;
+      currentCol = 0;
+    }
+
+    // Stop if exceeding max rows
+    if (currentRow >= MAX_ROWS) break;
+
+    // Add word characters
+    for (const char of word) {
+      tempLayout.push({ char, row: currentRow, col: currentCol });
+      currentCol++;
+    }
+
+    // Add space after word (if not last word)
+    if (wordIdx < words.length - 1) {
+      tempLayout.push({ char: ' ', row: currentRow, col: currentCol });
+      currentCol++;
+    }
+  }
+
+  // Final row max
+  maxColInRow = Math.max(maxColInRow, currentCol);
+  longestLineChars = maxColInRow;
+
+  // Calculate optimal cell width to fit longest line with some margin
+  const MARGIN_CHARS = 1; // Leave space for 1 char on each side
+  const availableWidth = gridWidthUnits;
+  const targetChars = longestLineChars + MARGIN_CHARS;
+  const optimalCellWidth = Math.floor(availableWidth / targetChars);
+
+  // Scale cell height proportionally (maintain aspect ratio)
+  const scaleFactor = optimalCellWidth / CHAR_CELL_WIDTH_UNITS;
+  const scaledCellHeight = Math.floor(CHAR_CELL_HEIGHT_UNITS * scaleFactor);
+
+  // Recalculate layout with new cell dimensions
+  const scaledCellWidthUnits = optimalCellWidth;
+  const scaledCellHeightUnits = scaledCellHeight;
+
+  const charsPerRow = Math.floor(gridWidthUnits / scaledCellWidthUnits);
+  const finalLayout = [];
+  currentRow = 0;
+  currentCol = 0;
+
+  for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+    const word = words[wordIdx];
+    const wordLength = word.length;
+
+    // Check if word fits on current row
+    if (currentCol > 0 && currentCol + wordLength > charsPerRow) {
+      currentRow++;
+      currentCol = 0;
+    }
+
+    // Add word characters
+    for (const char of word) {
+      finalLayout.push({ char, row: currentRow, col: currentCol });
+      currentCol++;
+    }
+
+    // Add space after word (if not last word)
+    if (wordIdx < words.length - 1) {
+      finalLayout.push({ char: ' ', row: currentRow, col: currentCol });
+      currentCol++;
+    }
+  }
+
+  // Calculate vertical centering
+  const totalRows = currentRow + 1;
+  const totalRowsInGrid = Math.floor(gridHeightUnits / scaledCellHeightUnits);
+  const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
+
+  // Apply vertical offset and convert to grid units
+  const characters = finalLayout.map((item, index) => {
+    const x = item.col * scaledCellWidthUnits;
+    const y = (item.row + verticalOffset) * scaledCellHeightUnits;
+
+    if ((x + scaledCellWidthUnits) > gridWidthUnits || (y + scaledCellHeightUnits) > gridHeightUnits) {
       return null;
     }
-    return { char, x, y, index };
+
+    return { char: item.char, x, y, index };
   }).filter(Boolean);
+
+  return {
+    characters,
+    cellWidth: scaledCellWidthUnits,
+    cellHeight: scaledCellHeightUnits,
+    contentWidth: Math.floor(CHAR_CONTENT_WIDTH * scaleFactor),
+    contentHeight: Math.floor(CHAR_CONTENT_HEIGHT * scaleFactor),
+    paddingUnits: Math.floor(CHAR_PADDING_UNITS * scaleFactor)
+  };
 }
 
 // --- Phase 1b: Build fixed walls from font data ---
@@ -92,11 +196,12 @@ function fontWallsToFixedWalls(characters, gridWidth, gridHeight, fontData) {
 // --- Phase 2: Detect stroke cells for a character ---
 // Scans the FULL character cell (including padding rows/cols) because some
 // characters ($, &, #) have font segments extending into/beyond the padding area.
-function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
+function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH, cellConfig) {
+  const { cellWidth, cellHeight } = cellConfig;
   // Full character cell area (including padding)
   const charCells = new Set();
-  for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
-    for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
+  for (let dy = 0; dy < cellHeight; dy++) {
+    for (let dx = 0; dx < cellWidth; dx++) {
       const gx = charX + dx;
       const gy = charY + dy;
       if (gx >= 0 && gx < gridW && gy >= 0 && gy < gridH) {
@@ -116,8 +221,8 @@ function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
   const strokeQueue = [];
 
   // Step 1: Seed high-confidence strokes (3+ walls or 2 opposite walls)
-  for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
-    for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
+  for (let dy = 0; dy < cellHeight; dy++) {
+    for (let dx = 0; dx < cellWidth; dx++) {
       const x = charX + dx;
       const y = charY + dy;
       if (x < 0 || x >= gridW || y < 0 || y >= gridH) continue;
@@ -172,8 +277,8 @@ function detectStrokesForChar(charX, charY, fixedWalls, gridW, gridH) {
   let changed = true;
   while (changed) {
     changed = false;
-    for (let dy = 0; dy < CHAR_CELL_HEIGHT_UNITS; dy++) {
-      for (let dx = 0; dx < CHAR_CELL_WIDTH_UNITS; dx++) {
+    for (let dy = 0; dy < cellHeight; dy++) {
+      for (let dx = 0; dx < cellWidth; dx++) {
         const x = charX + dx;
         const y = charY + dy;
         if (x < 0 || x >= gridW || y < 0 || y >= gridH) continue;
@@ -327,12 +432,13 @@ function findOuterStrokeCells(strokeCells, gridW, gridH, fixedWalls) {
 // Prefers gates opening onto PADDING (better for multi-letter BFS routing),
 // but falls back to content-area gates for compact characters like *.
 // Uses rng to randomly select from all valid candidates.
-function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsideCells, rng, charX, charY) {
+function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsideCells, rng, charX, charY, cellConfig) {
+  const { contentWidth, contentHeight, paddingUnits } = cellConfig;
   // Content area: the area inside the padding border
-  const contentMinX = charX + CHAR_PADDING_UNITS;
-  const contentMaxX = charX + CHAR_PADDING_UNITS + CHAR_CONTENT_WIDTH;
-  const contentMinY = charY + CHAR_PADDING_UNITS;
-  const contentMaxY = charY + CHAR_PADDING_UNITS + CHAR_CONTENT_HEIGHT;
+  const contentMinX = charX + paddingUnits;
+  const contentMaxX = charX + paddingUnits + contentWidth;
+  const contentMinY = charY + paddingUnits;
+  const contentMaxY = charY + paddingUnits + contentHeight;
   const isInContent = (cx, cy) => cx >= contentMinX && cx < contentMaxX && cy >= contentMinY && cy < contentMaxY;
 
   const paddingCandidates = [];  // outside cells in padding (preferred)
@@ -690,13 +796,22 @@ function fillRemainingSpace(grid, fixedWalls, gridW, gridH) {
 export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   if (!rng) rng = Math.random;
   if (!text || gridWidth <= 0 || gridHeight <= 0) {
-    return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null };
+    return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig: null };
   }
 
-  // Phase 1: Layout characters
-  const characters = layoutCharacters(text, gridWidth, gridHeight);
+  // Phase 1: Calculate optimal cell size and layout characters
+  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight);
+  const characters = layoutResult.characters;
+  const cellConfig = {
+    cellWidth: layoutResult.cellWidth,
+    cellHeight: layoutResult.cellHeight,
+    contentWidth: layoutResult.contentWidth,
+    contentHeight: layoutResult.contentHeight,
+    paddingUnits: layoutResult.paddingUnits
+  };
+
   if (characters.length === 0) {
-    return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null };
+    return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig };
   }
 
   // Phase 1b: Build fixed walls from font data
@@ -706,7 +821,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   const charStrokeCells = [];
   const allStrokeCells = new Set();
   for (const charInfo of characters) {
-    const strokes = detectStrokesForChar(charInfo.x, charInfo.y, fixedWalls, gridWidth, gridHeight);
+    const strokes = detectStrokesForChar(charInfo.x, charInfo.y, fixedWalls, gridWidth, gridHeight, cellConfig);
     charStrokeCells.push(strokes);
     for (const key of strokes) {
       allStrokeCells.add(key);
@@ -732,7 +847,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
       continue;
     }
 
-    const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, gridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y);
+    const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, gridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y, cellConfig);
     if (!pair) {
       entryExitPairs.push(null);
       continue;
@@ -826,7 +941,14 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     grid[exit.oy][exit.ox].walls[separationDirOpp] = true;
   }
 
-  // Phase 5: Carve external paths between consecutive non-space letters
+  // Phase 5a: Carve path from (0,0) to first letter's entry
+  const firstPair = entryExitPairs.find(pair => pair !== null);
+  const startCorner = { x: 0, y: 0 };
+  const pathToFirstLetter = firstPair
+    ? carveExternalPath(grid, fixedWalls, startCorner, { x: firstPair.entry.ox, y: firstPair.entry.oy }, gridWidth, gridHeight, visitedCells, allStrokeCells)
+    : null;
+
+  // Phase 5b: Carve external paths between consecutive non-space letters
   // Skip spaces when connecting - connect letter to next non-space letter
   const externalPaths = [];
   for (let i = 0; i < characters.length - 1; i++) {
@@ -855,15 +977,28 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     externalPaths.push(path);
   }
 
-  // Build full solution path
+  // Phase 5c: Carve path from last letter's exit to bottom-right corner
+  const lastPairIdx = entryExitPairs.map((p, i) => p ? i : -1).filter(i => i !== -1).pop();
+  const lastPair = lastPairIdx !== undefined ? entryExitPairs[lastPairIdx] : null;
+  const endCorner = { x: gridWidth - 1, y: gridHeight - 1 };
+  const pathFromLastLetter = lastPair
+    ? carveExternalPath(grid, fixedWalls, { x: lastPair.exit.ox, y: lastPair.exit.oy }, endCorner, gridWidth, gridHeight, visitedCells, allStrokeCells)
+    : null;
+
+  // Build full solution path (from top-left corner to bottom-right corner)
   const solutionPath = [];
+
+  // Start at (0,0)
+  if (pathToFirstLetter) {
+    solutionPath.push(...pathToFirstLetter);
+  }
+
+  // Path through each letter
   let pathIndex = 0;
   for (let i = 0; i < characters.length; i++) {
     if (!entryExitPairs[i]) continue;
     const pair = entryExitPairs[i];
 
-    // Outside entry cell
-    solutionPath.push({ x: pair.entry.ox, y: pair.entry.oy });
     // Path through letter
     if (letterPaths[i]) {
       solutionPath.push(...letterPaths[i]);
@@ -877,14 +1012,17 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     pathIndex++;
   }
 
+  // End at bottom-right corner
+  if (pathFromLastLetter) {
+    solutionPath.push(...pathFromLastLetter);
+  }
+
   // Phase 6: Fill remaining space with maze
   fillRemainingSpace(grid, fixedWalls, gridWidth, gridHeight);
 
-  // Phase 7: Define start and end
-  const firstPair = entryExitPairs[0];
-  const lastPair = entryExitPairs[characters.length - 1];
-  const startCell = firstPair ? { x: firstPair.entry.ox, y: firstPair.entry.oy } : null;
-  const endCell = lastPair ? { x: lastPair.exit.ox, y: lastPair.exit.oy } : null;
+  // Phase 7: Define start and end at corners
+  const startCell = { x: 0, y: 0 };
+  const endCell = { x: gridWidth - 1, y: gridHeight - 1 };
 
   // Convert grid to wall segments
   const walls = [];
@@ -906,5 +1044,6 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     endCell,
     entryExitPairs,
     strokeCells: allStrokeCells,
+    cellConfig, // Include dynamic cell dimensions
   };
 }
