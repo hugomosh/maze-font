@@ -8,7 +8,7 @@ import { recursiveBacktracker } from './mazeGenerator';
 // --- Constants (mirrored from SvgGrid.jsx) ---
 const CHAR_CONTENT_WIDTH = 8;
 const CHAR_CONTENT_HEIGHT = 14;
-const CHAR_PADDING_UNITS = 1;
+const CHAR_PADDING_UNITS =2
 const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
 const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2;
 

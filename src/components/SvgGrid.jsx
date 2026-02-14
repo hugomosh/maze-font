@@ -8,7 +8,7 @@ const MIN_UNIT_SIZE = 8;
 const MAX_UNIT_SIZE = 20;
 const CHAR_CONTENT_WIDTH = 8;
 const CHAR_CONTENT_HEIGHT = 14;
-const CHAR_PADDING_UNITS = 1;
+const CHAR_PADDING_UNITS = 2;
 const CONTAINER_PADDING = 0.1; // 10% padding on each side
 
 // Color palettes
@@ -82,7 +82,7 @@ function calculateOptimalUnitSize(text, width, height) {
   return MIN_UNIT_SIZE;
 }
 
-const SvgGrid = ({ width, height, text, showPath }) => {
+const SvgGrid = React.forwardRef(({ width, height, text, showPath }, ref) => {
   const result = useMemo(() => {
     if (width === 0 || height === 0) return {
       glyphWalls: new Map(),
@@ -172,7 +172,7 @@ const SvgGrid = ({ width, height, text, showPath }) => {
   const { glyphWalls, mazeWalls, characters, solutionPath, unitSize } = result;
 
   return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
+    <svg ref={ref} width={width} height={height} style={{ display: 'block' }}>
       {/* Background fill */}
       <rect width={width} height={height} fill="#f5f5f5" />
 
@@ -243,6 +243,8 @@ const SvgGrid = ({ width, height, text, showPath }) => {
       )}
     </svg>
   );
-};
+});
+
+SvgGrid.displayName = 'SvgGrid';
 
 export default SvgGrid;

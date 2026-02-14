@@ -8,6 +8,7 @@ const MazeGenerator = () => {
   const [showPath, setShowPath] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('square'); // 'square' or 'story'
   const gridRef = useRef(null);
+  const svgRef = useRef(null);
 
   useLayoutEffect(() => {
     if (!gridRef.current) return;
@@ -34,6 +35,51 @@ const MazeGenerator = () => {
     }
   };
 
+  const handleShare = async () => {
+    if (!svgRef.current) return;
+
+    try {
+      // Get the SVG element
+      const svgElement = svgRef.current;
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+
+      // Create a canvas to convert SVG to PNG
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Set canvas size to match SVG
+      canvas.width = svgElement.width.baseVal.value;
+      canvas.height = svgElement.height.baseVal.value;
+
+      // Create an image from the SVG data
+      const img = new Image();
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = () => {
+        // Draw the image on canvas
+        ctx.drawImage(img, 0, 0);
+
+        // Convert canvas to blob and download
+        canvas.toBlob((blob) => {
+          const link = document.createElement('a');
+          const fileName = text ? `maze-${text.replace(/\s+/g, '-').toLowerCase()}.png` : 'maze.png';
+          link.download = fileName;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+
+          // Cleanup
+          URL.revokeObjectURL(url);
+          URL.revokeObjectURL(link.href);
+        });
+      };
+
+      img.src = url;
+    } catch (error) {
+      console.error('Error downloading image:', error);
+    }
+  };
+
   return (
     <div className="maze-generator">
       <div className="input-container">
@@ -54,6 +100,9 @@ const MazeGenerator = () => {
           />
           <span>Show Path</span>
         </label>
+        <button className="share-button" onClick={handleShare}>
+          Share
+        </button>
       </div>
       <div className="format-selector">
         <button
@@ -71,7 +120,7 @@ const MazeGenerator = () => {
       </div>
       <div className="grid-container-wrapper">
         <div className={`grid-container ${aspectRatio}`} ref={gridRef}>
-          <SvgGrid width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} />
+          <SvgGrid ref={svgRef} width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} />
         </div>
       </div>
     </div>
