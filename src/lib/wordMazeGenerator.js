@@ -581,61 +581,98 @@ function findLetterPath(grid, entry, exit, strokeCells) {
 
 // --- Phase 5: Carve external path between letters (BFS) ---
 function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, visitedCells, allStrokeCells) {
-  // BFS from fromCell to toCell through unvisited non-stroke cells
-  const queue = [{ x: fromCell.x, y: fromCell.y, path: [{ x: fromCell.x, y: fromCell.y }] }];
-  const seen = new Set();
-  seen.add(`${fromCell.x},${fromCell.y}`);
+  // Helper to calculate Manhattan distance to target
+  const manhattanDist = (x, y) => Math.abs(x - toCell.x) + Math.abs(y - toCell.y);
+  const totalDistance = manhattanDist(fromCell.x, fromCell.y);
 
-  while (queue.length > 0) {
-    const { x, y, path } = queue.shift();
+  // Adaptive random factor based on distance
+  // Longer paths get more randomness (up to 4), shorter paths less (down to 1)
+  const maxRandomFactor = Math.min(4, Math.max(1, totalDistance / 5));
 
-    if (x === toCell.x && y === toCell.y) {
-      // Found path - carve it
-      for (let i = 0; i < path.length - 1; i++) {
-        const curr = path[i];
-        const next = path[i + 1];
-        const dx = next.x - curr.x;
-        const dy = next.y - curr.y;
+  // Try with decreasing randomness levels (fallback strategy)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const randomScale = attempt === 0 ? 1.0 : attempt === 1 ? 0.5 : 0.0; // 100%, 50%, 0%
+    const currentMaxRandom = maxRandomFactor * randomScale;
 
-        let dir;
-        if (dx === 1) dir = 'right';
-        else if (dx === -1) dir = 'left';
-        else if (dy === 1) dir = 'bottom';
-        else dir = 'top';
+    const queue = [{
+      x: fromCell.x,
+      y: fromCell.y,
+      path: [{ x: fromCell.x, y: fromCell.y }],
+      priority: 0
+    }];
+    const seen = new Set();
+    seen.add(`${fromCell.x},${fromCell.y}`);
 
-        grid[curr.y][curr.x].walls[dir] = false;
-        grid[next.y][next.x].walls[OPPOSITE[dir]] = false;
-        grid[curr.y][curr.x].visited = true;
-        grid[next.y][next.x].visited = true;
-        visitedCells.add(`${curr.x},${curr.y}`);
-        visitedCells.add(`${next.x},${next.y}`);
+    while (queue.length > 0) {
+      // Sort by priority (lower is better) - this adds the bias
+      queue.sort((a, b) => a.priority - b.priority);
+      const { x, y, path } = queue.shift();
+
+      if (x === toCell.x && y === toCell.y) {
+        // Found path - carve it
+        for (let i = 0; i < path.length - 1; i++) {
+          const curr = path[i];
+          const next = path[i + 1];
+          const dx = next.x - curr.x;
+          const dy = next.y - curr.y;
+
+          let dir;
+          if (dx === 1) dir = 'right';
+          else if (dx === -1) dir = 'left';
+          else if (dy === 1) dir = 'bottom';
+          else dir = 'top';
+
+          grid[curr.y][curr.x].walls[dir] = false;
+          grid[next.y][next.x].walls[OPPOSITE[dir]] = false;
+          grid[curr.y][curr.x].visited = true;
+          grid[next.y][next.x].visited = true;
+          visitedCells.add(`${curr.x},${curr.y}`);
+          visitedCells.add(`${next.x},${next.y}`);
+        }
+        return path;
       }
-      return path;
+
+      // Shuffle directions for randomness (only if randomScale > 0)
+      const dirs = ['top', 'right', 'bottom', 'left'];
+      if (randomScale > 0) {
+        for (let i = dirs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+        }
+      }
+
+      for (const dir of dirs) {
+        const nx = x + DIR_DX[dir];
+        const ny = y + DIR_DY[dir];
+        const nKey = `${nx},${ny}`;
+
+        if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) continue;
+        if (seen.has(nKey)) continue;
+        // Allow the target cell even if visited
+        if (nKey !== `${toCell.x},${toCell.y}`) {
+          if (visitedCells.has(nKey)) continue;
+          if (allStrokeCells.has(nKey)) continue;
+        }
+        // Check no fixed wall blocks movement
+        if (hasWall(fixedWalls, x, y, dir)) continue;
+        if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+
+        seen.add(nKey);
+
+        // Calculate priority: distance to target + random factor
+        // Lower priority = explored first
+        const distance = manhattanDist(nx, ny);
+        const randomFactor = Math.random() * currentMaxRandom;
+        const priority = distance + randomFactor;
+
+        queue.push({ x: nx, y: ny, path: [...path, { x: nx, y: ny }], priority });
+      }
     }
 
-    const dirs = ['top', 'right', 'bottom', 'left'];
-    for (const dir of dirs) {
-      const nx = x + DIR_DX[dir];
-      const ny = y + DIR_DY[dir];
-      const nKey = `${nx},${ny}`;
-
-      if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) continue;
-      if (seen.has(nKey)) continue;
-      // Allow the target cell even if visited
-      if (nKey !== `${toCell.x},${toCell.y}`) {
-        if (visitedCells.has(nKey)) continue;
-        if (allStrokeCells.has(nKey)) continue;
-      }
-      // Check no fixed wall blocks movement
-      if (hasWall(fixedWalls, x, y, dir)) continue;
-      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
-
-      seen.add(nKey);
-      queue.push({ x: nx, y: ny, path: [...path, { x: nx, y: ny }] });
-    }
+    // If we got here, this attempt failed - try next attempt with less randomness
   }
 
-  return null; // No path found
+  return null; // No path found after all attempts
 }
 
 // --- Phase 6: Fill remaining space with maze ---
