@@ -109,55 +109,44 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits) {
   };
 }
 
-// Compact mode: Reduce grid width to fit longest word (eliminate side margins)
+// Compact mode: Each word on its own line, centered, minimal padding
 function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits) {
   const cellWidth = CHAR_CELL_WIDTH_UNITS;
   const cellHeight = CHAR_CELL_HEIGHT_UNITS;
-  const words = text.split(' ');
+  const words = text.split(' ').filter(w => w.length > 0);
 
-  // Find longest word
-  const longestWordLength = Math.max(...words.map(w => w.length));
+  // Find longest word for horizontal centering
+  const longestWordLength = Math.max(...words.map(w => w.length), 1);
 
-  // Add minimal margin (1 char on each side)
-  const SIDE_MARGIN_CHARS = 1;
-  const compactGridWidth = (longestWordLength + SIDE_MARGIN_CHARS * 2) * cellWidth;
-
-  // Use compact width for layout calculation
-  const charsPerRow = Math.floor(compactGridWidth / cellWidth);
   const tempLayout = [];
-  let currentRow = 0;
-  let currentCol = 0;
+  const charsPerRow = longestWordLength;
 
+  // Place each word on its own line, centered
   for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
     const word = words[wordIdx];
     const wordLength = word.length;
 
-    if (currentCol > 0 && currentCol + wordLength > charsPerRow) {
-      currentRow++;
-      currentCol = 0;
-    }
+    // Center each word horizontally
+    const horizontalOffset = Math.floor((charsPerRow - wordLength) / 2);
 
-    for (const char of word) {
-      tempLayout.push({ char, row: currentRow, col: currentCol });
-      currentCol++;
-    }
-
-    if (wordIdx < words.length - 1) {
-      tempLayout.push({ char: ' ', row: currentRow, col: currentCol });
-      currentCol++;
+    for (let charIdx = 0; charIdx < wordLength; charIdx++) {
+      tempLayout.push({
+        char: word[charIdx],
+        row: wordIdx,
+        col: horizontalOffset + charIdx
+      });
     }
   }
 
-  const totalRows = currentRow + 1;
+  const totalRows = words.length;
   const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
   const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
 
-  // Center horizontally within the compact grid
-  const maxColInLayout = Math.max(...tempLayout.map(item => item.col));
-  const horizontalOffset = Math.floor((charsPerRow - maxColInLayout - 1) / 2);
+  const charsPerGridRow = Math.floor(gridWidthUnits / cellWidth);
+  const horizontalGridOffset = Math.floor((charsPerGridRow - charsPerRow) / 2);
 
   const characters = tempLayout.map((item, index) => {
-    const x = (item.col + horizontalOffset) * cellWidth;
+    const x = (item.col + horizontalGridOffset) * cellWidth;
     const y = (item.row + verticalOffset) * cellHeight;
 
     if ((x + cellWidth) > gridWidthUnits || (y + cellHeight) > gridHeightUnits) {
@@ -174,7 +163,6 @@ function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits) {
     contentWidth: CHAR_CONTENT_WIDTH,
     contentHeight: CHAR_CONTENT_HEIGHT,
     paddingUnits: CHAR_PADDING_UNITS,
-    compactGridWidth // Return the compact grid width for rendering
   };
 }
 

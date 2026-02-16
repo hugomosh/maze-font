@@ -95,10 +95,43 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       actualMazeHeightUnits: 0,
     };
 
-    // Use fixed grid dimensions for consistent maze resolution across devices
-    // This ensures the same maze complexity on mobile and desktop
-    const gridWidthUnits = 80;
-    const gridHeightUnits = 80;
+    // Calculate grid dimensions based on mode
+    let gridWidthUnits, gridHeightUnits;
+
+    if (sizingMode === 'compact') {
+      // Compact mode: calculate exact dimensions needed for text
+      // Each word on a new line, minimal padding
+      const words = text.split(' ').filter(w => w.length > 0);
+      const longestWordLength = Math.max(...words.map(w => w.length), 1);
+      const numWords = words.length;
+
+      // Calculate grid size: longest word + padding on sides, word count + padding top/bottom
+      const SIDE_PADDING = CHAR_CELL_WIDTH_UNITS * 2; // 2 cells padding on each side
+      const VERTICAL_PADDING = CHAR_CELL_HEIGHT_UNITS * 2; // 2 cells padding top/bottom
+
+      gridWidthUnits = (longestWordLength * CHAR_CELL_WIDTH_UNITS) + SIDE_PADDING;
+      gridHeightUnits = (numWords * CHAR_CELL_HEIGHT_UNITS) + VERTICAL_PADDING;
+    } else {
+      // Standard/Autofit modes: use reference size for consistent resolution across devices
+      const referenceSize = 800;
+      const targetUnitSize = 10;
+
+      const baseGridWidth = Math.floor(referenceSize / targetUnitSize);
+      const baseGridHeight = Math.floor(referenceSize / targetUnitSize);
+
+      // Adjust grid dimensions based on aspect ratio
+      const aspectRatio = width / height;
+
+      if (aspectRatio > 1) {
+        // Wider than tall
+        gridWidthUnits = Math.floor(baseGridWidth * aspectRatio);
+        gridHeightUnits = baseGridHeight;
+      } else {
+        // Taller than wide
+        gridWidthUnits = baseGridWidth;
+        gridHeightUnits = Math.floor(baseGridHeight / aspectRatio);
+      }
+    }
 
     const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode);
 
