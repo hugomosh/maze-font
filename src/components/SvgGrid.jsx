@@ -91,19 +91,31 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       solutionPath: [],
       unitSize: BASE_UNIT_SIZE,
       cellConfig: null,
+      actualMazeWidthUnits: 0,
+      actualMazeHeightUnits: 0,
     };
 
-    // Start with a base unit size to get grid dimensions
-    const initialUnitSize = MIN_UNIT_SIZE;
-    const gridWidthUnits = Math.floor(width / initialUnitSize);
-    const gridHeightUnits = Math.floor(height / initialUnitSize);
+    // Use fixed grid dimensions for consistent maze resolution across devices
+    // This ensures the same maze complexity on mobile and desktop
+    const gridWidthUnits = 80;
+    const gridHeightUnits = 80;
 
     const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode);
 
-    // Calculate actual unit size based on the grid dimensions
-    // We want to fit the grid snugly in the available space
-    const unitSizeFromWidth = width / gridWidthUnits;
-    const unitSizeFromHeight = height / gridHeightUnits;
+    // Calculate actual maze dimensions (compact mode may use less width)
+    let actualMazeWidthUnits = gridWidthUnits;
+    let actualMazeHeightUnits = gridHeightUnits;
+
+    if (wmResult.walls.length > 0) {
+      const maxX = Math.max(...wmResult.walls.map(([x1, , x2]) => Math.max(x1, x2)));
+      const maxY = Math.max(...wmResult.walls.map(([, y1, , y2]) => Math.max(y1, y2)));
+      actualMazeWidthUnits = maxX;
+      actualMazeHeightUnits = maxY;
+    }
+
+    // Calculate unit size to fit the actual maze in available space
+    const unitSizeFromWidth = width / actualMazeWidthUnits;
+    const unitSizeFromHeight = height / actualMazeHeightUnits;
     const unitSize = Math.min(unitSizeFromWidth, unitSizeFromHeight);
 
     // Step 1: Build potential glyph walls from fontData
@@ -173,24 +185,30 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       solutionPath: wmResult.solutionPath || [],
       unitSize,
       cellConfig: wmResult.cellConfig,
+      actualMazeWidthUnits,
+      actualMazeHeightUnits,
     };
   }, [width, height, text, sizingMode]);
 
-  const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig } = result;
+  const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig, actualMazeWidthUnits, actualMazeHeightUnits } = result;
+
+  // Calculate rendered dimensions (adjust for compact mode)
+  const renderedWidth = actualMazeWidthUnits > 0 ? actualMazeWidthUnits * unitSize : width;
+  const renderedHeight = actualMazeHeightUnits > 0 ? actualMazeHeightUnits * unitSize : height;
 
   return (
-    <svg ref={ref} width={width} height={height} style={{ display: 'block' }}>
+    <svg ref={ref} width={renderedWidth} height={renderedHeight} style={{ display: 'block' }}>
       {/* Background fill */}
-      <rect width={width} height={height} fill="#f5f5f5" />
+      <rect width={renderedWidth} height={renderedHeight} fill="#f5f5f5" />
 
-      {/* Render maze walls (everything except glyphs, varied grays) */}
+      {/* Render maze walls (everything except glyphs, single gray) */}
       {mazeWalls.map(([x1, y1, x2, y2], i) => (
         <line
           key={`maze-${i}`}
           x1={x1 * unitSize} y1={y1 * unitSize}
           x2={x2 * unitSize} y2={y2 * unitSize}
-          stroke={BACKGROUND_COLORS[i % BACKGROUND_COLORS.length]}
-          strokeWidth={Math.max(3, unitSize * 0.25)}
+          stroke="#d4d4d4"
+          strokeWidth={unitSize * 0.25}
           strokeLinecap="square"
         />
       ))}
@@ -204,7 +222,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
             x1={x1 * unitSize} y1={y1 * unitSize}
             x2={x2 * unitSize} y2={y2 * unitSize}
             stroke={color}
-            strokeWidth={Math.max(4, unitSize * 0.3)}
+            strokeWidth={unitSize * 0.3}
             strokeLinecap="round"
           />
         ));
@@ -218,7 +236,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
           ).join(' ')}
           fill="none"
           stroke="#ff6b6b"
-          strokeWidth={Math.max(2, unitSize * 0.15)}
+          strokeWidth={unitSize * 0.15}
           strokeLinecap="round"
           strokeLinejoin="round"
           opacity="0.8"
@@ -235,7 +253,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
             r={unitSize * 0.3}
             fill="#51cf66"
             stroke="#2b8a3e"
-            strokeWidth="2"
+            strokeWidth={unitSize * 0.1}
           />
           {/* End marker (red) */}
           <circle
@@ -244,7 +262,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
             r={unitSize * 0.3}
             fill="#ff6b6b"
             stroke="#c92a2a"
-            strokeWidth="2"
+            strokeWidth={unitSize * 0.1}
           />
         </>
       )}

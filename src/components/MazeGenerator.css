@@ -235,8 +235,9 @@
 
 .grid-container.square {
   aspect-ratio: 1 / 1;
-  width: min(90vh, 90vw);
-  height: min(90vh, 90vw);
+  width: 100%;
+  max-width: min(calc(100vh - 200px), 100%);
+  height: auto;
 }
 
 .grid-container.story {
