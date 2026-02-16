@@ -7,6 +7,7 @@ const MazeGenerator = () => {
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
   const [showPath, setShowPath] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('square'); // 'square' or 'story'
+  const [sizingMode, setSizingMode] = useState('autofit'); // 'standard', 'autofit', 'compact'
   const gridRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -118,9 +119,32 @@ const MazeGenerator = () => {
           Story (9:16)
         </button>
       </div>
+      <div className="format-selector sizing-mode-selector">
+        <button
+          className={sizingMode === 'standard' ? 'active' : ''}
+          onClick={() => setSizingMode('standard')}
+          title="Fixed cell size, original layout"
+        >
+          Standard
+        </button>
+        <button
+          className={sizingMode === 'autofit' ? 'active' : ''}
+          onClick={() => setSizingMode('autofit')}
+          title="Scale cells to fit text perfectly"
+        >
+          Autofit
+        </button>
+        <button
+          className={sizingMode === 'compact' ? 'active' : ''}
+          onClick={() => setSizingMode('compact')}
+          title="Reduce grid padding for mobile"
+        >
+          Compact
+        </button>
+      </div>
       <div className="grid-container-wrapper">
         <div className={`grid-container ${aspectRatio}`} ref={gridRef}>
-          <SvgGrid ref={svgRef} width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} />
+          <SvgGrid ref={svgRef} width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} sizingMode={sizingMode} />
         </div>
       </div>
     </div>

@@ -42,8 +42,144 @@ const DIR_DX = { top: 0, bottom: 0, left: -1, right: 1 };
 const DIR_DY = { top: -1, bottom: 1, left: 0, right: 0 };
 
 // --- Phase 1: Calculate optimal cell size and layout characters ---
-// Wraps text by words and scales cells to fit the longest line
-function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits) {
+// Wraps text by words and scales cells based on sizing mode
+function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits, sizingMode = 'autofit') {
+  if (sizingMode === 'standard') {
+    return calculateStandardLayout(text, gridWidthUnits, gridHeightUnits);
+  } else if (sizingMode === 'compact') {
+    return calculateCompactLayout(text, gridWidthUnits, gridHeightUnits);
+  }
+  // Default to autofit mode
+  return calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits);
+}
+
+// Standard mode: Fixed cell size, word wrapping, vertical centering
+function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits) {
+  const cellWidth = CHAR_CELL_WIDTH_UNITS;
+  const cellHeight = CHAR_CELL_HEIGHT_UNITS;
+  const words = text.split(' ');
+
+  const charsPerRow = Math.floor(gridWidthUnits / cellWidth);
+  const tempLayout = [];
+  let currentRow = 0;
+  let currentCol = 0;
+
+  for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+    const word = words[wordIdx];
+    const wordLength = word.length;
+
+    if (currentCol > 0 && currentCol + wordLength > charsPerRow) {
+      currentRow++;
+      currentCol = 0;
+    }
+
+    for (const char of word) {
+      tempLayout.push({ char, row: currentRow, col: currentCol });
+      currentCol++;
+    }
+
+    if (wordIdx < words.length - 1) {
+      tempLayout.push({ char: ' ', row: currentRow, col: currentCol });
+      currentCol++;
+    }
+  }
+
+  const totalRows = currentRow + 1;
+  const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
+  const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
+
+  const characters = tempLayout.map((item, index) => {
+    const x = item.col * cellWidth;
+    const y = (item.row + verticalOffset) * cellHeight;
+
+    if ((x + cellWidth) > gridWidthUnits || (y + cellHeight) > gridHeightUnits) {
+      return null;
+    }
+
+    return { char: item.char, x, y, index };
+  }).filter(Boolean);
+
+  return {
+    characters,
+    cellWidth,
+    cellHeight,
+    contentWidth: CHAR_CONTENT_WIDTH,
+    contentHeight: CHAR_CONTENT_HEIGHT,
+    paddingUnits: CHAR_PADDING_UNITS
+  };
+}
+
+// Compact mode: Reduce grid width to fit longest word (eliminate side margins)
+function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits) {
+  const cellWidth = CHAR_CELL_WIDTH_UNITS;
+  const cellHeight = CHAR_CELL_HEIGHT_UNITS;
+  const words = text.split(' ');
+
+  // Find longest word
+  const longestWordLength = Math.max(...words.map(w => w.length));
+
+  // Add minimal margin (1 char on each side)
+  const SIDE_MARGIN_CHARS = 1;
+  const compactGridWidth = (longestWordLength + SIDE_MARGIN_CHARS * 2) * cellWidth;
+
+  // Use compact width for layout calculation
+  const charsPerRow = Math.floor(compactGridWidth / cellWidth);
+  const tempLayout = [];
+  let currentRow = 0;
+  let currentCol = 0;
+
+  for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
+    const word = words[wordIdx];
+    const wordLength = word.length;
+
+    if (currentCol > 0 && currentCol + wordLength > charsPerRow) {
+      currentRow++;
+      currentCol = 0;
+    }
+
+    for (const char of word) {
+      tempLayout.push({ char, row: currentRow, col: currentCol });
+      currentCol++;
+    }
+
+    if (wordIdx < words.length - 1) {
+      tempLayout.push({ char: ' ', row: currentRow, col: currentCol });
+      currentCol++;
+    }
+  }
+
+  const totalRows = currentRow + 1;
+  const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
+  const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
+
+  // Center horizontally within the compact grid
+  const maxColInLayout = Math.max(...tempLayout.map(item => item.col));
+  const horizontalOffset = Math.floor((charsPerRow - maxColInLayout - 1) / 2);
+
+  const characters = tempLayout.map((item, index) => {
+    const x = (item.col + horizontalOffset) * cellWidth;
+    const y = (item.row + verticalOffset) * cellHeight;
+
+    if ((x + cellWidth) > gridWidthUnits || (y + cellHeight) > gridHeightUnits) {
+      return null;
+    }
+
+    return { char: item.char, x, y, index };
+  }).filter(Boolean);
+
+  return {
+    characters,
+    cellWidth,
+    cellHeight,
+    contentWidth: CHAR_CONTENT_WIDTH,
+    contentHeight: CHAR_CONTENT_HEIGHT,
+    paddingUnits: CHAR_PADDING_UNITS,
+    compactGridWidth // Return the compact grid width for rendering
+  };
+}
+
+// Autofit mode: Scales cells to fit the longest line
+function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits) {
   // Try with maximum of 2 rows
   const MAX_ROWS = 2;
   const words = text.split(' ');
@@ -793,14 +929,14 @@ function fillRemainingSpace(grid, fixedWalls, gridW, gridH) {
 }
 
 // --- Main entry point ---
-export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
+export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit') {
   if (!rng) rng = Math.random;
   if (!text || gridWidth <= 0 || gridHeight <= 0) {
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig: null };
   }
 
-  // Phase 1: Calculate optimal cell size and layout characters
-  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight);
+  // Phase 1: Calculate optimal cell size and layout characters (based on sizing mode)
+  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight, sizingMode);
   const characters = layoutResult.characters;
   const cellConfig = {
     cellWidth: layoutResult.cellWidth,
@@ -814,14 +950,19 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig };
   }
 
+  // For compact mode, use the reduced grid width
+  const effectiveGridWidth = (sizingMode === 'compact' && layoutResult.compactGridWidth)
+    ? Math.ceil(layoutResult.compactGridWidth)
+    : gridWidth;
+
   // Phase 1b: Build fixed walls from font data
-  const fixedWalls = fontWallsToFixedWalls(characters, gridWidth, gridHeight, fontData);
+  const fixedWalls = fontWallsToFixedWalls(characters, effectiveGridWidth, gridHeight, fontData);
 
   // Phase 2: Detect stroke cells for each character
   const charStrokeCells = [];
   const allStrokeCells = new Set();
   for (const charInfo of characters) {
-    const strokes = detectStrokesForChar(charInfo.x, charInfo.y, fixedWalls, gridWidth, gridHeight, cellConfig);
+    const strokes = detectStrokesForChar(charInfo.x, charInfo.y, fixedWalls, effectiveGridWidth, gridHeight, cellConfig);
     charStrokeCells.push(strokes);
     for (const key of strokes) {
       allStrokeCells.add(key);
@@ -832,7 +973,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   const charOuterStrokeCells = [];
   const charOutsideCells = [];
   for (let i = 0; i < characters.length; i++) {
-    const { outerStroke, outside } = findOuterStrokeCells(charStrokeCells[i], gridWidth, gridHeight, fixedWalls);
+    const { outerStroke, outside } = findOuterStrokeCells(charStrokeCells[i], effectiveGridWidth, gridHeight, fixedWalls);
     charOuterStrokeCells.push(outerStroke);
     charOutsideCells.push(outside);
   }
@@ -847,19 +988,19 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
       continue;
     }
 
-    const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, gridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y, cellConfig);
+    const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, effectiveGridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y, cellConfig);
     if (!pair) {
       entryExitPairs.push(null);
       continue;
     }
     // Open outer walls, add center wall + blocking wall
-    applyEntryExit(fixedWalls, pair, gridWidth, gridHeight);
+    applyEntryExit(fixedWalls, pair, effectiveGridWidth, gridHeight);
     entryExitPairs.push(pair);
   }
 
   // Build the grid
   const grid = Array.from({ length: gridHeight }, (_, y) =>
-    Array.from({ length: gridWidth }, (_, x) => ({
+    Array.from({ length: effectiveGridWidth }, (_, x) => ({
       x, y, visited: false,
       walls: { top: true, right: true, bottom: true, left: true },
     }))
@@ -883,7 +1024,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
       const cell = grid[y][x];
       const fixed = fixedWalls.get(key) || { top: false, right: false, bottom: false, left: false };
       if (!fixed.top && y > 0) { cell.walls.top = false; grid[y - 1][x].walls.bottom = false; }
-      if (!fixed.right && x < gridWidth - 1) { cell.walls.right = false; grid[y][x + 1].walls.left = false; }
+      if (!fixed.right && x < effectiveGridWidth - 1) { cell.walls.right = false; grid[y][x + 1].walls.left = false; }
       if (!fixed.bottom && y < gridHeight - 1) { cell.walls.bottom = false; grid[y + 1][x].walls.top = false; }
       if (!fixed.left && x > 0) { cell.walls.left = false; grid[y][x - 1].walls.right = false; }
     }
@@ -945,7 +1086,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   const firstPair = entryExitPairs.find(pair => pair !== null);
   const startCorner = { x: 0, y: 0 };
   const pathToFirstLetter = firstPair
-    ? carveExternalPath(grid, fixedWalls, startCorner, { x: firstPair.entry.ox, y: firstPair.entry.oy }, gridWidth, gridHeight, visitedCells, allStrokeCells)
+    ? carveExternalPath(grid, fixedWalls, startCorner, { x: firstPair.entry.ox, y: firstPair.entry.oy }, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells)
     : null;
 
   // Phase 5b: Carve external paths between consecutive non-space letters
@@ -973,16 +1114,16 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
     const fromCell = { x: exitPair.ox, y: exitPair.oy };
     const toCell = { x: entryPair.ox, y: entryPair.oy };
 
-    const path = carveExternalPath(grid, fixedWalls, fromCell, toCell, gridWidth, gridHeight, visitedCells, allStrokeCells);
+    const path = carveExternalPath(grid, fixedWalls, fromCell, toCell, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells);
     externalPaths.push(path);
   }
 
   // Phase 5c: Carve path from last letter's exit to bottom-right corner
   const lastPairIdx = entryExitPairs.map((p, i) => p ? i : -1).filter(i => i !== -1).pop();
   const lastPair = lastPairIdx !== undefined ? entryExitPairs[lastPairIdx] : null;
-  const endCorner = { x: gridWidth - 1, y: gridHeight - 1 };
+  const endCorner = { x: effectiveGridWidth - 1, y: gridHeight - 1 };
   const pathFromLastLetter = lastPair
-    ? carveExternalPath(grid, fixedWalls, { x: lastPair.exit.ox, y: lastPair.exit.oy }, endCorner, gridWidth, gridHeight, visitedCells, allStrokeCells)
+    ? carveExternalPath(grid, fixedWalls, { x: lastPair.exit.ox, y: lastPair.exit.oy }, endCorner, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells)
     : null;
 
   // Build full solution path (from top-left corner to bottom-right corner)
@@ -1018,16 +1159,16 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng) {
   }
 
   // Phase 6: Fill remaining space with maze
-  fillRemainingSpace(grid, fixedWalls, gridWidth, gridHeight);
+  fillRemainingSpace(grid, fixedWalls, effectiveGridWidth, gridHeight);
 
   // Phase 7: Define start and end at corners
   const startCell = { x: 0, y: 0 };
-  const endCell = { x: gridWidth - 1, y: gridHeight - 1 };
+  const endCell = { x: effectiveGridWidth - 1, y: gridHeight - 1 };
 
   // Convert grid to wall segments
   const walls = [];
   for (let y = 0; y < gridHeight; y++) {
-    for (let x = 0; x < gridWidth; x++) {
+    for (let x = 0; x < effectiveGridWidth; x++) {
       const cell = grid[y][x];
       if (cell.walls.top) walls.push([x, y, x + 1, y]);
       if (cell.walls.right) walls.push([x + 1, y, x + 1, y + 1]);

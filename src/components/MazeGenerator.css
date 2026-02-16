@@ -173,6 +173,34 @@
   border-color: #4ecdc4;
 }
 
+.sizing-mode-selector {
+  padding-top: 0.5rem;
+  border-top: 1px solid #e8e8e8;
+}
+
+.sizing-mode-selector button {
+  flex: 1;
+  min-width: 80px;
+}
+
+.sizing-mode-selector button.active {
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  color: white;
+  border-color: #6c5ce7;
+}
+
+@media (max-width: 768px) {
+  .sizing-mode-selector {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .sizing-mode-selector button {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+    min-width: 70px;
+  }
+}
+
 .grid-container-wrapper {
   flex-grow: 1;
   display: flex;
