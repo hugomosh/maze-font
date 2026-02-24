@@ -3,7 +3,7 @@ import SvgGrid, { CHAR_CELL_WIDTH_UNITS, CHAR_CELL_HEIGHT_UNITS, UNIT_SIZE_EXPOR
 import './MazeGenerator.css';
 
 const MazeGenerator = () => {
-  const [text, setText] = useState('Jonathan');
+  const [text, setText] = useState('Your Message Here');
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
   const [showPath, setShowPath] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('square'); // 'square' or 'story'
