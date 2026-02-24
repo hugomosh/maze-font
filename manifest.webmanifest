@@ -1,0 +1,1 @@
+{"name":"Maze Font","short_name":"MazeFont","description":"Create and share mazes from text","start_url":"/maze-font/","display":"standalone","background_color":"#ffffff","theme_color":"#ffffff","lang":"en","scope":"/maze-font/","icons":[{"src":"pwa-192x192.png","sizes":"192x192","type":"image/png"},{"src":"pwa-512x512.png","sizes":"512x512","type":"image/png"}]}
