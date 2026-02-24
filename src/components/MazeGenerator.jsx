@@ -143,7 +143,7 @@ const MazeGenerator = () => {
         </button>
       </div>
       <div className="grid-container-wrapper">
-        <div className={`grid-container ${aspectRatio}`} ref={gridRef}>
+        <div className={`grid-container ${aspectRatio} ${sizingMode === 'compact' ? 'compact-mode' : ''}`} ref={gridRef}>
           <SvgGrid ref={svgRef} width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} sizingMode={sizingMode} />
         </div>
       </div>

@@ -240,9 +240,28 @@
   height: auto;
 }
 
+.grid-container.square.compact-mode {
+  aspect-ratio: auto;
+  width: 100%;
+  max-width: min(calc(100vh - 200px), 100%);
+  height: calc(100vh - 200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .grid-container.story {
   aspect-ratio: 9 / 16;
   width: min(50vh, 90vw);
   height: min(88vh, calc(90vw * 16 / 9));
+}
+
+.grid-container.story.compact-mode {
+  aspect-ratio: auto;
+  width: min(50vh, 90vw);
+  height: min(88vh, calc(90vw * 16 / 9));
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 

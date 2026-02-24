@@ -225,14 +225,23 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
 
   const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig, actualMazeWidthUnits, actualMazeHeightUnits } = result;
 
-  // Calculate rendered dimensions (adjust for compact mode)
-  const renderedWidth = actualMazeWidthUnits > 0 ? actualMazeWidthUnits * unitSize : width;
-  const renderedHeight = actualMazeHeightUnits > 0 ? actualMazeHeightUnits * unitSize : height;
+  // SVG always fills the container
+  const svgWidth = width;
+  const svgHeight = height;
+
+  // Calculate maze dimensions and centering offset
+  const mazeWidth = actualMazeWidthUnits * unitSize;
+  const mazeHeight = actualMazeHeightUnits * unitSize;
+  const offsetX = (svgWidth - mazeWidth) / 2;
+  const offsetY = (svgHeight - mazeHeight) / 2;
 
   return (
-    <svg ref={ref} width={renderedWidth} height={renderedHeight} style={{ display: 'block' }}>
+    <svg ref={ref} width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
       {/* Background fill */}
-      <rect width={renderedWidth} height={renderedHeight} fill="#f5f5f5" />
+      <rect width={svgWidth} height={svgHeight} fill="#f5f5f5" />
+
+      {/* Group for centered maze content */}
+      <g transform={`translate(${offsetX}, ${offsetY})`}>
 
       {/* Render maze walls (everything except glyphs, single gray) */}
       {mazeWalls.map(([x1, y1, x2, y2], i) => (
@@ -299,6 +308,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
           />
         </>
       )}
+      </g>
     </svg>
   );
 });
