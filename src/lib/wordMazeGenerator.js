@@ -906,18 +906,18 @@ function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, vis
 }
 
 // --- Phase 6: Fill remaining space with maze ---
-function fillRemainingSpace(grid, fixedWalls, gridW, gridH) {
+function fillRemainingSpace(grid, fixedWalls, gridW, gridH, verticalBias = 1) {
   for (let y = 0; y < gridH; y++) {
     for (let x = 0; x < gridW; x++) {
       if (!grid[y][x].visited) {
-        recursiveBacktracker(grid, grid[y][x], fixedWalls);
+        recursiveBacktracker(grid, grid[y][x], fixedWalls, verticalBias);
       }
     }
   }
 }
 
 // --- Main entry point ---
-export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit') {
+export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit', verticalBias = 1) {
   if (!rng) rng = Math.random;
   if (!text || gridWidth <= 0 || gridHeight <= 0) {
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig: null };
@@ -1147,7 +1147,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
   }
 
   // Phase 6: Fill remaining space with maze
-  fillRemainingSpace(grid, fixedWalls, effectiveGridWidth, gridHeight);
+  fillRemainingSpace(grid, fixedWalls, effectiveGridWidth, gridHeight, verticalBias);
 
   // Phase 7: Define start and end at corners
   const startCell = { x: 0, y: 0 };

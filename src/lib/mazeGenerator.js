@@ -1,6 +1,7 @@
 // fixedWalls: Map where key is "x,y" and value is { top, right, bottom, left } booleans
 // indicating which walls are fixed and shouldn't be removed
-export function recursiveBacktracker(grid, startCell, fixedWalls = new Map()) {
+// verticalBias: how many times more likely vertical neighbors (top/bottom) are chosen (default 1 = uniform)
+export function recursiveBacktracker(grid, startCell, fixedWalls = new Map(), verticalBias = 1) {
   if (!startCell) return grid;
 
   const stack = [];
@@ -38,7 +39,13 @@ export function recursiveBacktracker(grid, startCell, fixedWalls = new Map()) {
     }
 
     if (neighbors.length > 0) {
-      const { cell: chosen, dir } = neighbors[Math.floor(Math.random() * neighbors.length)];
+      // Weight vertical neighbors (top/bottom) by verticalBias
+      const weighted = [];
+      for (const n of neighbors) {
+        const count = (n.dir === 'top' || n.dir === 'bottom') ? verticalBias : 1;
+        for (let i = 0; i < count; i++) weighted.push(n);
+      }
+      const { cell: chosen, dir } = weighted[Math.floor(Math.random() * weighted.length)];
       chosen.visited = true;
 
       if (dir === 'top') { current.walls.top = false; chosen.walls.bottom = false; }

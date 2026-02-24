@@ -8,6 +8,7 @@ const MazeGenerator = () => {
   const [showPath, setShowPath] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('square'); // 'square' or 'story'
   const [sizingMode, setSizingMode] = useState('autofit'); // 'standard', 'autofit', 'compact'
+  const [verticalBias, setVerticalBias] = useState(1); // 1=uniform, 3=vertical, 8=strong vertical
   const gridRef = useRef(null);
   const svgRef = useRef(null);
 
@@ -142,9 +143,32 @@ const MazeGenerator = () => {
           Compact
         </button>
       </div>
+      <div className="format-selector">
+        <button
+          className={verticalBias === 1 ? 'active' : ''}
+          onClick={() => setVerticalBias(1)}
+          title="Uniform random maze"
+        >
+          Normal
+        </button>
+        <button
+          className={verticalBias === 3 ? 'active' : ''}
+          onClick={() => setVerticalBias(3)}
+          title="Vertical corridors preferred"
+        >
+          Vertical
+        </button>
+        <button
+          className={verticalBias === 8 ? 'active' : ''}
+          onClick={() => setVerticalBias(8)}
+          title="Strong vertical corridor bias"
+        >
+          Strong
+        </button>
+      </div>
       <div className="grid-container-wrapper">
         <div className={`grid-container ${aspectRatio} ${sizingMode === 'compact' ? 'compact-mode' : ''}`} ref={gridRef}>
-          <SvgGrid ref={svgRef} width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} sizingMode={sizingMode} />
+          <SvgGrid ref={svgRef} width={gridSize.width} height={gridSize.height} text={text} showPath={showPath} sizingMode={sizingMode} verticalBias={verticalBias} />
         </div>
       </div>
     </div>
