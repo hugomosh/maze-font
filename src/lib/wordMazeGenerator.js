@@ -38,23 +38,36 @@ function isConnected(fixedWalls, x1, y1, x2, y2) {
 }
 
 const OPPOSITE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+
+// Returns {hFactor, vFactor} in 0..1 for a position string
+function getPositionFactors(position) {
+  const hMap = {
+    'top-left': 0, 'left': 0, 'bottom-left': 0,
+    'top': 0.5, 'center': 0.5, 'bottom': 0.5,
+    'top-right': 1, 'right': 1, 'bottom-right': 1,
+  };
+  const vMap = {
+    'top-left': 0, 'top': 0, 'top-right': 0,
+    'left': 0.5, 'center': 0.5, 'right': 0.5,
+    'bottom-left': 1, 'bottom': 1, 'bottom-right': 1,
+  };
+  return { hFactor: hMap[position] ?? 0.5, vFactor: vMap[position] ?? 0.5 };
+}
 const DIR_DX = { top: 0, bottom: 0, left: -1, right: 1 };
 const DIR_DY = { top: -1, bottom: 1, left: 0, right: 0 };
 
 // --- Phase 1: Calculate optimal cell size and layout characters ---
-// Wraps text by words and scales cells based on sizing mode
-function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits, sizingMode = 'autofit') {
+function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits, sizingMode = 'autofit', position = 'center') {
   if (sizingMode === 'standard') {
-    return calculateStandardLayout(text, gridWidthUnits, gridHeightUnits);
+    return calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position);
   } else if (sizingMode === 'compact') {
-    return calculateCompactLayout(text, gridWidthUnits, gridHeightUnits);
+    return calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position);
   }
-  // Default to autofit mode
-  return calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits);
+  return calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position);
 }
 
-// Standard mode: Fixed cell size, word wrapping, vertical centering
-function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits) {
+// Standard mode: Fixed cell size, word wrapping, position-aware placement
+function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
   const cellWidth = CHAR_CELL_WIDTH_UNITS;
   const cellHeight = CHAR_CELL_HEIGHT_UNITS;
   const words = text.split(' ');
@@ -86,7 +99,8 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits) {
 
   const totalRows = currentRow + 1;
   const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
-  const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
+  const { vFactor } = getPositionFactors(position);
+  const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - totalRows) * vFactor);
 
   const characters = tempLayout.map((item, index) => {
     const x = item.col * cellWidth;
@@ -109,8 +123,8 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits) {
   };
 }
 
-// Compact mode: Each word on its own line, centered, minimal padding
-function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits) {
+// Compact mode: Each word on its own line, position-aware placement
+function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
   const cellWidth = CHAR_CELL_WIDTH_UNITS;
   const cellHeight = CHAR_CELL_HEIGHT_UNITS;
   const words = text.split(' ').filter(w => w.length > 0);
@@ -140,10 +154,11 @@ function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits) {
 
   const totalRows = words.length;
   const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
-  const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
-
   const charsPerGridRow = Math.floor(gridWidthUnits / cellWidth);
-  const horizontalGridOffset = Math.floor((charsPerGridRow - charsPerRow) / 2);
+
+  const { hFactor, vFactor } = getPositionFactors(position);
+  const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - totalRows) * vFactor);
+  const horizontalGridOffset = Math.floor(Math.max(0, charsPerGridRow - charsPerRow) * hFactor);
 
   const characters = tempLayout.map((item, index) => {
     const x = (item.col + horizontalGridOffset) * cellWidth;
@@ -166,8 +181,8 @@ function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits) {
   };
 }
 
-// Autofit mode: Scales cells to fit the longest line
-function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits) {
+// Autofit mode: Scales cells to fit the longest line, position-aware vertical placement
+function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
   // Try with maximum of 2 rows
   const MAX_ROWS = 2;
   const words = text.split(' ');
@@ -257,12 +272,12 @@ function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits) {
     }
   }
 
-  // Calculate vertical centering
+  // Calculate vertical placement based on position
   const totalRows = currentRow + 1;
   const totalRowsInGrid = Math.floor(gridHeightUnits / scaledCellHeightUnits);
-  const verticalOffset = Math.floor((totalRowsInGrid - totalRows) / 2);
+  const { vFactor } = getPositionFactors(position);
+  const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - totalRows) * vFactor);
 
-  // Apply vertical offset and convert to grid units
   const characters = finalLayout.map((item, index) => {
     const x = item.col * scaledCellWidthUnits;
     const y = (item.row + verticalOffset) * scaledCellHeightUnits;
@@ -917,14 +932,14 @@ function fillRemainingSpace(grid, fixedWalls, gridW, gridH, verticalBias = 1) {
 }
 
 // --- Main entry point ---
-export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit', verticalBias = 1) {
+export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit', verticalBias = 1, position = 'center') {
   if (!rng) rng = Math.random;
   if (!text || gridWidth <= 0 || gridHeight <= 0) {
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig: null };
   }
 
   // Phase 1: Calculate optimal cell size and layout characters (based on sizing mode)
-  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight, sizingMode);
+  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight, sizingMode, position);
   const characters = layoutResult.characters;
   const cellConfig = {
     cellWidth: layoutResult.cellWidth,

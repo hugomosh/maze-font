@@ -23,9 +23,6 @@ const THEMES = {
   ink:     { bg: '#ffffff', maze: '#aaaaaa', glyph: '#000000' },
 };
 
-// Position factor maps: [horizontal, vertical] in 0..1
-const POS_H = { 'top-left': 0, 'left': 0, 'bottom-left': 0, 'top': 0.5, 'center': 0.5, 'bottom': 0.5, 'top-right': 1, 'right': 1, 'bottom-right': 1 };
-const POS_V = { 'top-left': 0, 'top': 0, 'top-right': 0, 'left': 0.5, 'center': 0.5, 'right': 0.5, 'bottom-left': 1, 'bottom': 1, 'bottom-right': 1 };
 
 export const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
 export const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2;
@@ -91,45 +88,20 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       actualMazeHeightUnits: 0,
     };
 
-    // Calculate grid dimensions based on mode
-    let gridWidthUnits, gridHeightUnits;
+    // All modes use the same full-canvas grid — the maze always fills the space.
+    // sizingMode and position control how the text block is placed within the grid.
+    const referenceSize = 800;
+    const targetUnitSize = 10;
+    const baseGrid = Math.floor(referenceSize / targetUnitSize);
+    const aspectRatio = width / height;
+    const gridWidthUnits = aspectRatio > 1
+      ? Math.floor(baseGrid * aspectRatio)
+      : baseGrid;
+    const gridHeightUnits = aspectRatio > 1
+      ? baseGrid
+      : Math.floor(baseGrid / aspectRatio);
 
-    if (sizingMode === 'compact') {
-      // Compact mode: calculate exact dimensions needed for text
-      // Each word on a new line, minimal padding
-      const words = text.split(' ').filter(w => w.length > 0);
-      const longestWordLength = Math.max(...words.map(w => w.length), 1);
-      const numWords = words.length;
-
-      // Calculate grid size: longest word + padding on sides, word count + padding top/bottom
-      const SIDE_PADDING = CHAR_CELL_WIDTH_UNITS * 2; // 2 cells padding on each side
-      const VERTICAL_PADDING = CHAR_CELL_HEIGHT_UNITS * 2; // 2 cells padding top/bottom
-
-      gridWidthUnits = (longestWordLength * CHAR_CELL_WIDTH_UNITS) + SIDE_PADDING;
-      gridHeightUnits = (numWords * CHAR_CELL_HEIGHT_UNITS) + VERTICAL_PADDING;
-    } else {
-      // Standard/Autofit modes: use reference size for consistent resolution across devices
-      const referenceSize = 800;
-      const targetUnitSize = 10;
-
-      const baseGridWidth = Math.floor(referenceSize / targetUnitSize);
-      const baseGridHeight = Math.floor(referenceSize / targetUnitSize);
-
-      // Adjust grid dimensions based on aspect ratio
-      const aspectRatio = width / height;
-
-      if (aspectRatio > 1) {
-        // Wider than tall
-        gridWidthUnits = Math.floor(baseGridWidth * aspectRatio);
-        gridHeightUnits = baseGridHeight;
-      } else {
-        // Taller than wide
-        gridWidthUnits = baseGridWidth;
-        gridHeightUnits = Math.floor(baseGridHeight / aspectRatio);
-      }
-    }
-
-    const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode, verticalBias);
+    const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode, verticalBias, position);
 
     // Calculate actual maze dimensions (compact mode may use less width)
     let actualMazeWidthUnits = gridWidthUnits;
@@ -217,7 +189,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       actualMazeWidthUnits,
       actualMazeHeightUnits,
     };
-  }, [width, height, text, sizingMode, verticalBias]);
+  }, [width, height, text, sizingMode, verticalBias, position]);
 
   const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig, actualMazeWidthUnits, actualMazeHeightUnits } = result;
 
@@ -226,10 +198,9 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
 
   const mazeWidth = actualMazeWidthUnits * unitSize;
   const mazeHeight = actualMazeHeightUnits * unitSize;
-  const freeX = Math.max(0, svgWidth - mazeWidth);
-  const freeY = Math.max(0, svgHeight - mazeHeight);
-  const offsetX = freeX * (POS_H[position] ?? 0.5);
-  const offsetY = freeY * (POS_V[position] ?? 0.5);
+  // Maze always fills the canvas; just center the rendered block for robustness
+  const offsetX = (svgWidth - mazeWidth) / 2;
+  const offsetY = (svgHeight - mazeHeight) / 2;
 
   const th = THEMES[theme] || THEMES.classic;
 
