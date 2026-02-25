@@ -11,25 +11,21 @@ const CHAR_CONTENT_HEIGHT = 14;
 const CHAR_PADDING_UNITS = 2;
 const CONTAINER_PADDING = 0.1; // 10% padding on each side
 
-// Color palettes
 const LETTER_COLORS = [
-  '#ff6b6b', // Red
-  '#4ecdc4', // Teal
-  '#45b7d1', // Blue
-  '#f9ca24', // Yellow
-  '#6c5ce7', // Purple
-  '#a29bfe', // Light purple
-  '#fd79a8', // Pink
-  '#fdcb6e', // Orange
-  '#55efc4', // Mint
-  '#74b9ff', // Sky blue
+  '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7',
+  '#a29bfe', '#fd79a8', '#fdcb6e', '#55efc4', '#74b9ff',
 ];
 
-const BACKGROUND_COLORS = [
-  '#e8e8e8', // Light gray
-  '#d4d4d4', // Medium gray
-  '#c0c0c0', // Gray
-];
+const THEMES = {
+  classic: { bg: '#f5f5f5', maze: '#d4d4d4', glyph: null },
+  dark:    { bg: '#1a1a2e', maze: '#2d3561', glyph: null },
+  mono:    { bg: '#ffffff', maze: '#e0e0e0', glyph: '#2c3e50' },
+  ink:     { bg: '#ffffff', maze: '#aaaaaa', glyph: '#000000' },
+};
+
+// Position factor maps: [horizontal, vertical] in 0..1
+const POS_H = { 'top-left': 0, 'left': 0, 'bottom-left': 0, 'top': 0.5, 'center': 0.5, 'bottom': 0.5, 'top-right': 1, 'right': 1, 'bottom-right': 1 };
+const POS_V = { 'top-left': 0, 'top': 0, 'top-right': 0, 'left': 0.5, 'center': 0.5, 'right': 0.5, 'bottom-left': 1, 'bottom': 1, 'bottom-right': 1 };
 
 export const CHAR_CELL_WIDTH_UNITS = CHAR_CONTENT_WIDTH + CHAR_PADDING_UNITS * 2;
 export const CHAR_CELL_HEIGHT_UNITS = CHAR_CONTENT_HEIGHT + CHAR_PADDING_UNITS * 2;
@@ -82,7 +78,7 @@ function calculateOptimalUnitSize(text, width, height) {
   return MIN_UNIT_SIZE;
 }
 
-const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 'autofit', verticalBias = 1 }, ref) => {
+const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 'autofit', verticalBias = 1, position = 'center', theme = 'classic' }, ref) => {
   const result = useMemo(() => {
     if (width === 0 || height === 0) return {
       glyphWalls: new Map(),
@@ -225,39 +221,40 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
 
   const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig, actualMazeWidthUnits, actualMazeHeightUnits } = result;
 
-  // SVG always fills the container
   const svgWidth = width;
   const svgHeight = height;
 
-  // Calculate maze dimensions and centering offset
   const mazeWidth = actualMazeWidthUnits * unitSize;
   const mazeHeight = actualMazeHeightUnits * unitSize;
-  const offsetX = (svgWidth - mazeWidth) / 2;
-  const offsetY = (svgHeight - mazeHeight) / 2;
+  const freeX = Math.max(0, svgWidth - mazeWidth);
+  const freeY = Math.max(0, svgHeight - mazeHeight);
+  const offsetX = freeX * (POS_H[position] ?? 0.5);
+  const offsetY = freeY * (POS_V[position] ?? 0.5);
+
+  const th = THEMES[theme] || THEMES.classic;
 
   return (
     <svg ref={ref} width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
-      {/* Background fill */}
-      <rect width={svgWidth} height={svgHeight} fill="#f5f5f5" />
+      <rect width={svgWidth} height={svgHeight} fill={th.bg} />
 
       {/* Group for centered maze content */}
       <g transform={`translate(${offsetX}, ${offsetY})`}>
 
-      {/* Render maze walls (everything except glyphs, single gray) */}
       {mazeWalls.map(([x1, y1, x2, y2], i) => (
         <line
           key={`maze-${i}`}
           x1={x1 * unitSize} y1={y1 * unitSize}
           x2={x2 * unitSize} y2={y2 * unitSize}
-          stroke="#d4d4d4"
+          stroke={th.maze}
           strokeWidth={unitSize * 0.25}
           strokeLinecap="square"
         />
       ))}
 
-      {/* Render filtered glyph walls (letter shapes only, excluding removed entry/exit) */}
       {Array.from(glyphWalls.entries()).map(([charIndex, walls]) => {
-        const color = LETTER_COLORS[charIndex % LETTER_COLORS.length];
+        const color = th.glyph !== null
+          ? th.glyph
+          : LETTER_COLORS[charIndex % LETTER_COLORS.length];
         return walls.map(([x1, y1, x2, y2], i) => (
           <line
             key={`glyph-${charIndex}-${i}`}

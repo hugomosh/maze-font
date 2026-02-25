@@ -14,7 +14,7 @@
 ════════════════════════════════════════════════════════ */
 
 .ctrl-panel {
-  width: 300px;
+  width: 268px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -24,18 +24,17 @@
   z-index: 50;
 }
 
-/* Mobile handle — hidden on desktop */
 .sheet-handle-btn {
   display: none;
 }
 
 .ctrl-inner {
   flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem 1.25rem;
+  padding: 1rem 0.9rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.8rem;
+  overflow: hidden; /* no scrollbar */
 }
 
 /* ════════════════════════════════════════════════════════
@@ -43,26 +42,20 @@
 ════════════════════════════════════════════════════════ */
 
 .app-brand {
-  padding-bottom: 1.25rem;
-  border-bottom: 3px solid transparent;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid transparent;
   border-image: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #f9ca24, #6c5ce7) 1;
 }
 
 .app-title {
-  margin: 0 0 0.2rem;
-  font-size: 1.8rem;
+  margin: 0;
+  font-size: 1.55rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   background: linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 50%, #6c5ce7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-.app-sub {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #aaa;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -72,15 +65,15 @@
 .ctrl-section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .ctrl-label {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: #bbb;
+  color: #c0c0c0;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -95,12 +88,12 @@
 
 .maze-input {
   width: 100%;
-  padding: 0.7rem 3.2rem 0.7rem 0.8rem;
-  font-size: 16px; /* prevent iOS zoom */
+  padding: 0.55rem 3rem 0.55rem 0.7rem;
+  font-size: 16px;
   background: #f8f8f8;
   color: #0d1b2a;
-  border: 2px solid #ebebeb;
-  border-radius: 8px;
+  border: 1.5px solid #ebebeb;
+  border-radius: 7px;
   box-sizing: border-box;
   transition: border-color 0.15s, background 0.15s;
   touch-action: manipulation;
@@ -114,13 +107,13 @@
 }
 
 .maze-input::placeholder {
-  color: #c0c0c0;
+  color: #c8c8c8;
 }
 
 .char-badge {
   position: absolute;
-  right: 0.65rem;
-  font-size: 0.72rem;
+  right: 0.6rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: #6c5ce7;
   pointer-events: none;
@@ -133,7 +126,7 @@
 
 .size-cards {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .size-card {
@@ -141,11 +134,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.75rem 0.35rem 0.6rem;
+  gap: 0.3rem;
+  padding: 0.55rem 0.25rem 0.45rem;
   background: #f8f8f8;
-  border: 2px solid #ebebeb;
-  border-radius: 10px;
+  border: 1.5px solid #ebebeb;
+  border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   font-family: inherit;
@@ -159,11 +152,11 @@
 .size-card.active {
   border-color: #4ecdc4;
   background: #f0fffe;
-  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.15);
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.15);
 }
 
 .size-preview-wrap {
-  height: 46px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -171,8 +164,8 @@
 
 .size-shape {
   display: block;
-  border: 2.5px solid #ccc;
-  border-radius: 3px;
+  border: 2px solid #d0d0d0;
+  border-radius: 2px;
   background: white;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -183,15 +176,48 @@
 }
 
 .size-name {
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: #0d1b2a;
 }
 
 .size-ratio {
-  font-size: 0.66rem;
-  color: #bbb;
+  font-size: 0.62rem;
+  color: #c0c0c0;
   font-weight: 500;
+}
+
+/* ════════════════════════════════════════════════════════
+   Position grid
+════════════════════════════════════════════════════════ */
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 20px);
+  grid-template-rows: repeat(3, 20px);
+  gap: 4px;
+  width: fit-content;
+}
+
+.pos-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #e0e0e0;
+  background: #f5f5f5;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  padding: 0;
+}
+
+.pos-dot:hover {
+  border-color: #4ecdc4;
+  background: #e8faf9;
+}
+
+.pos-dot.active {
+  background: linear-gradient(135deg, #4ecdc4, #45b7d1);
+  border-color: #4ecdc4;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -201,23 +227,24 @@
 .segment-ctrl {
   display: flex;
   background: #f0f0f0;
-  border-radius: 8px;
-  padding: 3px;
+  border-radius: 7px;
+  padding: 2px;
   gap: 2px;
 }
 
 .segment-ctrl button {
   flex: 1;
-  padding: 0.45rem;
+  padding: 0.38rem 0.25rem;
   border: none;
   background: transparent;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  border-radius: 5px;
+  font-size: 0.78rem;
   font-weight: 500;
-  color: #888;
+  color: #999;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.12s;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 .segment-ctrl button:hover {
@@ -228,7 +255,7 @@
   background: white;
   color: #0d1b2a;
   font-weight: 600;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* ════════════════════════════════════════════════════════
@@ -241,19 +268,19 @@
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
-  padding: 0.15rem 0;
+  padding: 0.1rem 0;
 }
 
 .toggle-label {
-  font-size: 0.88rem;
+  font-size: 0.83rem;
   color: #0d1b2a;
 }
 
 .toggle-sw {
-  width: 44px;
-  height: 24px;
+  width: 38px;
+  height: 21px;
   background: #e0e0e0;
-  border-radius: 12px;
+  border-radius: 11px;
   position: relative;
   flex-shrink: 0;
   transition: background 0.2s;
@@ -267,16 +294,16 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   background: white;
   border-radius: 50%;
   transition: transform 0.2s;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .toggle-sw.on .toggle-thumb {
-  transform: translateX(20px);
+  transform: translateX(17px);
 }
 
 /* ════════════════════════════════════════════════════════
@@ -285,12 +312,12 @@
 
 .download-btn {
   width: 100%;
-  padding: 0.875rem;
+  padding: 0.7rem;
   background: linear-gradient(135deg, #ff6b6b, #fd79a8);
   color: white;
   border: none;
-  border-radius: 10px;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
@@ -301,7 +328,7 @@
 
 .download-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(255, 107, 107, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
 }
 
 .download-btn:active {
@@ -321,7 +348,6 @@
   position: relative;
 }
 
-/* Mobile text bar — hidden on desktop */
 .mobile-text-bar {
   display: none;
 }
@@ -386,18 +412,14 @@
   max-width: 100%;
 }
 
-/* Compact mode — fills space, no forced ratio */
+/* Compact mode — the format aspect ratio is still respected;
+   only the internal maze layout changes (handled in SvgGrid) */
 .grid-container.compact-mode {
-  aspect-ratio: auto !important;
-  width: 100% !important;
-  height: calc(100vh - 100px) !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* no overrides — format classes govern shape */
 }
 
 /* ════════════════════════════════════════════════════════
-   Sheet overlay — shown only on mobile
+   Sheet overlay — mobile only
 ════════════════════════════════════════════════════════ */
 
 .sheet-overlay {
@@ -414,13 +436,12 @@
     flex-direction: column;
   }
 
-  /* Hide desktop-only elements */
   .ctrl-desktop-only,
   .app-brand {
     display: none;
   }
 
-  /* Panel becomes a bottom sheet */
+  /* Bottom sheet */
   .ctrl-panel {
     position: fixed;
     bottom: 0;
@@ -432,16 +453,21 @@
     border-top: 1px solid #ebebeb;
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
-    transform: translateY(calc(100% - 54px));
+    transform: translateY(calc(100% - 52px));
     transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
     z-index: 50;
+    overflow: hidden;
   }
 
   .ctrl-panel.open {
     transform: translateY(0);
   }
 
-  /* Show handle */
+  /* Mobile: allow scrolling inside sheet if content is tall */
+  .ctrl-panel.open .ctrl-inner {
+    overflow-y: auto;
+  }
+
   .sheet-handle-btn {
     display: flex;
     flex-direction: column;
@@ -449,7 +475,7 @@
     justify-content: center;
     gap: 5px;
     width: 100%;
-    height: 54px;
+    height: 52px;
     background: none;
     border: none;
     cursor: pointer;
@@ -460,21 +486,20 @@
 
   .sheet-pip {
     display: block;
-    width: 36px;
+    width: 32px;
     height: 4px;
     background: #ddd;
     border-radius: 2px;
   }
 
   .sheet-handle-label {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
-    color: #aaa;
+    color: #bbb;
     text-transform: uppercase;
     letter-spacing: 0.07em;
   }
 
-  /* Overlay */
   .sheet-overlay {
     display: block;
     position: fixed;
@@ -495,9 +520,9 @@
   .mobile-text-bar {
     display: flex;
     align-items: center;
-    padding: 0.6rem 0.75rem;
+    padding: 0.55rem 0.75rem;
     background: white;
-    border-bottom: 3px solid transparent;
+    border-bottom: 2px solid transparent;
     border-image: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #f9ca24, #6c5ce7) 1;
     flex-shrink: 0;
     position: relative;
@@ -508,13 +533,12 @@
     flex: 1;
   }
 
-  /* Reserve space for the bottom handle */
   .maze-main {
     height: 100vh;
-    padding-bottom: 54px;
+    padding-bottom: 52px;
   }
 
-  /* Grid sizing on mobile */
+  /* Grid sizing on mobile — format still respected */
   .grid-container.square {
     width: min(100%, calc(100vh - 180px));
     height: auto;
@@ -530,18 +554,18 @@
     width: auto;
     max-width: 100%;
   }
+}
 
-  .grid-container.compact-mode {
-    height: calc(100vh - 180px) !important;
-  }
+/* Thin scrollbar inside mobile sheet */
+.ctrl-inner::-webkit-scrollbar {
+  width: 3px;
+}
 
-  /* Size cards — slightly more compact in sheet */
-  .size-card {
-    padding: 0.65rem 0.3rem 0.55rem;
-  }
+.ctrl-inner::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-  .ctrl-inner {
-    padding: 1rem;
-    gap: 1rem;
-  }
+.ctrl-inner::-webkit-scrollbar-thumb {
+  background: #e8e8e8;
+  border-radius: 2px;
 }

@@ -3,9 +3,9 @@ import SvgGrid from './SvgGrid';
 import './MazeGenerator.css';
 
 const SIZE_OPTIONS = [
-  { id: 'square',    label: 'Square',    sub: '1 : 1',  w: 36, h: 36 },
-  { id: 'landscape', label: 'Landscape', sub: '16 : 9', w: 50, h: 28 },
-  { id: 'story',     label: 'Story',     sub: '9 : 16', w: 21, h: 37 },
+  { id: 'square',    label: 'Square',    sub: '1:1',   w: 34, h: 34 },
+  { id: 'landscape', label: 'Landscape', sub: '16:9',  w: 48, h: 27 },
+  { id: 'story',     label: 'Story',     sub: '9:16',  w: 20, h: 36 },
 ];
 
 const SIZING_OPTIONS = [
@@ -20,6 +20,20 @@ const BIAS_OPTIONS = [
   { id: 8, label: 'Strong',   title: 'Strong vertical bias' },
 ];
 
+const THEME_OPTIONS = [
+  { id: 'classic', label: 'Classic' },
+  { id: 'dark',    label: 'Dark' },
+  { id: 'mono',    label: 'Mono' },
+  { id: 'ink',     label: 'Ink' },
+];
+
+// 3×3 position grid — row-major order
+const POS_GRID = [
+  ['top-left',    'top',    'top-right'],
+  ['left',        'center', 'right'],
+  ['bottom-left', 'bottom', 'bottom-right'],
+];
+
 const MAX_CHARS = 20;
 
 const MazeGenerator = () => {
@@ -29,6 +43,8 @@ const MazeGenerator = () => {
   const [aspectRatio, setAspectRatio] = useState('square');
   const [sizingMode, setSizingMode] = useState('autofit');
   const [verticalBias, setVerticalBias] = useState(1);
+  const [textPosition, setTextPosition] = useState('center');
+  const [theme, setTheme] = useState('classic');
   const [panelOpen, setPanelOpen] = useState(false);
   const gridRef = useRef(null);
   const svgRef = useRef(null);
@@ -84,7 +100,7 @@ const MazeGenerator = () => {
       {/* ── Controls: sidebar on desktop / bottom sheet on mobile ── */}
       <aside className={`ctrl-panel${panelOpen ? ' open' : ''}`}>
 
-        {/* Handle bar — only shown on mobile */}
+        {/* Handle — mobile only */}
         <button
           className="sheet-handle-btn"
           onClick={() => setPanelOpen(v => !v)}
@@ -96,16 +112,14 @@ const MazeGenerator = () => {
           </span>
         </button>
 
-        {/* Scrollable content */}
         <div className="ctrl-inner">
 
           {/* Brand — desktop only */}
           <div className="app-brand">
             <h1 className="app-title">Maze Font</h1>
-            <p className="app-sub">Type a name, get a maze</p>
           </div>
 
-          {/* Text input — desktop only (mobile gets its own bar) */}
+          {/* Text — desktop only */}
           <div className="ctrl-section ctrl-desktop-only">
             <label className="ctrl-label">Your Text</label>
             <div className="text-input-group">
@@ -136,6 +150,35 @@ const MazeGenerator = () => {
                   <span className="size-name">{opt.label}</span>
                   <span className="size-ratio">{opt.sub}</span>
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Position — 3×3 dot grid */}
+          <div className="ctrl-section">
+            <label className="ctrl-label">Position</label>
+            <div className="pos-grid">
+              {POS_GRID.map((row, r) => row.map(pos => (
+                <button
+                  key={pos}
+                  className={`pos-dot${textPosition === pos ? ' active' : ''}`}
+                  onClick={() => setTextPosition(pos)}
+                  title={pos.replace('-', ' ')}
+                />
+              )))}
+            </div>
+          </div>
+
+          {/* Style / theme */}
+          <div className="ctrl-section">
+            <label className="ctrl-label">Style</label>
+            <div className="segment-ctrl">
+              {THEME_OPTIONS.map(opt => (
+                <button
+                  key={opt.id}
+                  className={theme === opt.id ? 'active' : ''}
+                  onClick={() => setTheme(opt.id)}
+                >{opt.label}</button>
               ))}
             </div>
           </div>
@@ -199,7 +242,7 @@ const MazeGenerator = () => {
       {/* ── Main canvas area ── */}
       <main className="maze-main">
 
-        {/* Mobile-only text input */}
+        {/* Mobile text bar */}
         <div className="mobile-text-bar">
           <input
             type="text"
@@ -211,7 +254,7 @@ const MazeGenerator = () => {
           <span className="char-badge">{text.length}/{MAX_CHARS}</span>
         </div>
 
-        {/* Overlay when sheet is open */}
+        {/* Sheet overlay */}
         <div
           className={`sheet-overlay${panelOpen ? ' visible' : ''}`}
           onClick={() => setPanelOpen(false)}
@@ -231,6 +274,8 @@ const MazeGenerator = () => {
               showPath={showPath}
               sizingMode={sizingMode}
               verticalBias={verticalBias}
+              position={textPosition}
+              theme={theme}
             />
           </div>
         </div>
