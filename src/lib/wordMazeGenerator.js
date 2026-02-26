@@ -570,7 +570,9 @@ function findOuterStrokeCells(strokeCells, gridW, gridH, fixedWalls) {
 // Prefers gates opening onto PADDING (better for multi-letter BFS routing),
 // but falls back to content-area gates for compact characters like *.
 // Uses rng to randomly select from all valid candidates.
-function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsideCells, rng, charX, charY, cellConfig) {
+// allStrokeCells: stroke cells of ALL letters — used to prefer gates whose
+// outside cells have at least one free (non-stroke) neighbor so the BFS can escape.
+function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsideCells, rng, charX, charY, cellConfig, allStrokeCells) {
   const { contentWidth, contentHeight, paddingUnits } = cellConfig;
   // Content area: the area inside the padding border
   const contentMinX = charX + paddingUnits;
@@ -626,6 +628,22 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
   const candidates = paddingCandidates.length > 0 ? paddingCandidates : contentCandidates;
   if (candidates.length === 0) return null;
 
+  // Score how many non-allStroke free neighbors each candidate's outside cells have.
+  // Higher score = better chance the BFS can escape to free space from that gate.
+  function gateEscapeScore(candidate) {
+    if (!allStrokeCells) return 0;
+    const { entry, exit } = candidate;
+    let score = 0;
+    for (const [ox, oy] of [[entry.ox, entry.oy], [exit.ox, exit.oy]]) {
+      for (const [nx, ny] of [[ox - 1, oy], [ox + 1, oy], [ox, oy - 1], [ox, oy + 1]]) {
+        if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH && !allStrokeCells.has(`${nx},${ny}`)) {
+          score++;
+        }
+      }
+    }
+    return score;
+  }
+
   // Prefer gates where the separation wall keeps all strokes reachable (simple cycles).
   // For branching topologies ($, &), fall back to best gate without connectivity requirement.
   const connectedCandidates = candidates.filter(candidate => {
@@ -633,16 +651,23 @@ function findAdjacentEntryExitPair(strokeCells, fixedWalls, gridW, gridH, outsid
   });
 
   if (connectedCandidates.length > 0) {
-    return connectedCandidates[Math.floor(rng() * connectedCandidates.length)];
+    // Among connected candidates, prefer those with escape routes from their outside cells.
+    const withEscape = connectedCandidates.filter(c => gateEscapeScore(c) > 0);
+    const pool = withEscape.length > 0 ? withEscape : connectedCandidates;
+    return pool[Math.floor(rng() * pool.length)];
   }
 
-  // Fallback: pick the gate that maximizes reachable cells from entry
+  // Fallback: pick the gate that maximizes reachable cells from entry,
+  // breaking ties in favour of candidates with better escape scores.
   let bestCandidate = null;
   let bestReachable = 0;
+  let bestEscape = -1;
   for (const candidate of candidates) {
     const reachable = countReachable(candidate, strokeCells, fixedWalls);
-    if (reachable > bestReachable) {
+    const escape = gateEscapeScore(candidate);
+    if (reachable > bestReachable || (reachable === bestReachable && escape > bestEscape)) {
       bestReachable = reachable;
+      bestEscape = escape;
       bestCandidate = candidate;
     }
   }
@@ -990,7 +1015,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
       continue;
     }
 
-    const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, effectiveGridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y, cellConfig);
+    const pair = findAdjacentEntryExitPair(charOuterStrokeCells[i], fixedWalls, effectiveGridWidth, gridHeight, charOutsideCells[i], rng, characters[i].x, characters[i].y, cellConfig, allStrokeCells);
     if (!pair) {
       entryExitPairs.push(null);
       continue;
