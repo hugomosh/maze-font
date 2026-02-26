@@ -68,16 +68,34 @@ const MazeGenerator = () => {
     if (!svgRef.current) return;
     try {
       const svg = svgRef.current;
-      const svgData = new XMLSerializer().serializeToString(svg);
+      const srcW = svg.width.baseVal.value;
+      const srcH = svg.height.baseVal.value;
+
+      // Scale up so the longer edge is at least 2048px
+      const EXPORT_MIN_PX = 2048;
+      const scale = Math.max(1, Math.ceil(EXPORT_MIN_PX / Math.max(srcW, srcH)));
+      const canvasW = Math.round(srcW * scale);
+      const canvasH = Math.round(srcH * scale);
+
+      // Clone SVG and stamp explicit export dimensions so the browser
+      // rasterises it at full resolution rather than screen size.
+      // viewBox locks the content coordinate space to the original screen
+      // dimensions so the SVG renderer scales it up proportionally.
+      const clone = svg.cloneNode(true);
+      clone.setAttribute('viewBox', `0 0 ${srcW} ${srcH}`);
+      clone.setAttribute('width', canvasW);
+      clone.setAttribute('height', canvasH);
+
+      const svgData = new XMLSerializer().serializeToString(clone);
       const canvas = document.createElement('canvas');
-      canvas.width = svg.width.baseVal.value;
-      canvas.height = svg.height.baseVal.value;
+      canvas.width = canvasW;
+      canvas.height = canvasH;
       const ctx = canvas.getContext('2d');
       const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, canvasW, canvasH);
         canvas.toBlob(pngBlob => {
           const link = document.createElement('a');
           link.download = text

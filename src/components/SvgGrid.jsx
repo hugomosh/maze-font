@@ -17,7 +17,7 @@ const LETTER_COLORS = [
 ];
 
 const THEMES = {
-  classic: { bg: '#f5f5f5', maze: '#d4d4d4', glyph: null },
+  classic: { bg: '#fdfdfd', maze: '#d4d4d4', glyph: null },
   dark:    { bg: '#1a1a2e', maze: '#2d3561', glyph: null },
   mono:    { bg: '#ffffff', maze: '#e0e0e0', glyph: '#2c3e50' },
   ink:     { bg: '#ffffff', maze: '#aaaaaa', glyph: '#000000' },
