@@ -41,6 +41,16 @@ function setFixed(fixedWalls, x, y, dir, gridWidth, gridHeight) {
   fixedWalls.get(key)[dir] = true;
 }
 
+// Returns {ok:true} or {ok:false, step, from, to, dist} for the first gap found.
+function hasNoGaps(solutionPath) {
+  for (let i = 0; i < solutionPath.length - 1; i++) {
+    const a = solutionPath[i], b = solutionPath[i + 1];
+    const dist = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+    if (dist > 1) return { ok: false, step: i, from: a, to: b, dist };
+  }
+  return { ok: true };
+}
+
 function isConnected(fixedWalls, x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -782,8 +792,8 @@ import { generateWordMaze } from '../lib/wordMazeGenerator';
 
 describe('Word Maze - Multi Letter "LI"', () => {
   it('generates maze with external path connecting letters', () => {
-    const gridW = CHAR_CELL_WIDTH_UNITS * 2; // 20 (2 letters side by side)
-    const gridH = CHAR_CELL_HEIGHT_UNITS;     // 14
+    const gridW = CHAR_CELL_WIDTH_UNITS * 4; // 40 — extra width gives BFS room between letters
+    const gridH = CHAR_CELL_HEIGHT_UNITS * 2; // 32 — extra height ensures margin rows above/below
     const seed = 42;
     const rng = mulberry32(seed);
 
@@ -836,18 +846,9 @@ describe('Word Maze - Multi Letter "LI"', () => {
     const wallGrid = Array.from({ length: gridH }, (_, y) =>
       Array.from({ length: gridW }, (_, x) => ({ t: true, r: true, b: true, l: true }))
     );
-    // The wall segments from generateWordMaze are already the final walls
-    // We just need to check that consecutive solution path cells are adjacent
-    for (let i = 0; i < result.solutionPath.length - 1; i++) {
-      const curr = result.solutionPath[i];
-      const next = result.solutionPath[i + 1];
-      const dx = next.x - curr.x;
-      const dy = next.y - curr.y;
-      const dist = Math.abs(dx) + Math.abs(dy);
-      if (dist > 1) {
-        console.log(`Gap in solution path at step ${i}: (${curr.x},${curr.y}) -> (${next.x},${next.y}) dist=${dist}`);
-      }
-    }
+    // Consecutive solution path cells must be adjacent (no teleport gaps)
+    const gapCheck = hasNoGaps(result.solutionPath);
+    expect(gapCheck.ok).toBe(true);
   });
 });
 
@@ -898,15 +899,47 @@ describe('Word Maze - Multi Letter "HELLO"', () => {
     // Solution path should exist
     expect(result.solutionPath.length).toBeGreaterThan(0);
 
-    // Log any gaps (external BFS may fail when adjacent letters' side-gates trap the
-    // outside cell; this is a known limitation, not an assertion failure here).
-    for (let i = 0; i < result.solutionPath.length - 1; i++) {
-      const curr = result.solutionPath[i];
-      const next = result.solutionPath[i + 1];
-      const dist = Math.abs(next.x - curr.x) + Math.abs(next.y - curr.y);
-      if (dist > 1) {
-        console.log(`Gap at step ${i}: (${curr.x},${curr.y}) -> (${next.x},${next.y}) dist=${dist}`);
+    // Margin corridor fallback guarantees no gaps as long as margin rows exist.
+    const gapCheck = hasNoGaps(result.solutionPath);
+    expect(gapCheck.ok).toBe(true);
+  });
+});
+
+// --- Gap-free tests: generous grids guarantee margin rows exist ---
+// These grids are intentionally larger than the text band so topMarginY/bottomMarginY
+// are always valid, ensuring the corridor fallback can fire when BFS fails.
+
+describe('Word Maze - no gaps across multiple seeds', () => {
+  const seeds = [42, 123, 999, 7, 2025];
+  const gridW = 60;
+  const gridH = 30;
+
+  for (const text of ['LI', 'HI', 'AB', 'HELLO', 'HI THERE']) {
+    it(`"${text}" has a gap-free solution path for all seeds`, () => {
+      for (const seed of seeds) {
+        const rng = mulberry32(seed);
+        const result = generateWordMaze(text, gridW, gridH, fontData, rng);
+        expect(result.solutionPath.length).toBeGreaterThan(0);
+        const check = hasNoGaps(result.solutionPath);
+        expect(check.ok).toBe(
+          true,
+          `Gap at step ${check.step}: (${check.from?.x},${check.from?.y}) -> (${check.to?.x},${check.to?.y}) dist=${check.dist} [seed=${seed}]`
+        );
       }
-    }
+    });
+  }
+});
+
+describe('Word Maze - RNG determinism', () => {
+  it('produces identical solution paths for the same seed', () => {
+    const makeResult = () => {
+      const rng = mulberry32(42);
+      return generateWordMaze('HELLO', 60, 30, fontData, rng);
+    };
+    const r1 = makeResult();
+    const r2 = makeResult();
+    expect(r1.solutionPath).toEqual(r2.solutionPath);
+    expect(r1.entryExitPairs.map(p => p?.entry?.dir ?? null))
+      .toEqual(r2.entryExitPairs.map(p => p?.entry?.dir ?? null));
   });
 });

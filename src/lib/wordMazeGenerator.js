@@ -848,8 +848,66 @@ function findLetterPath(grid, entry, exit, strokeCells) {
   return null;
 }
 
+// --- Phase 5: Free-pass BFS (last-resort fallback) ---
+// Same as carveExternalPath but ignores the visitedCells constraint.
+// This guarantees a path whenever the grid is connected through non-stroke cells,
+// regardless of what earlier carving has already claimed as visited.
+// Used when all 3 normal BFS attempts fail (e.g. visitedCells blocks every route).
+function carveFreeExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, allStrokeCells, visitedCells, rng) {
+  const manhattanDist = (x, y) => Math.abs(x - toCell.x) + Math.abs(y - toCell.y);
+
+  const queue = [{
+    x: fromCell.x, y: fromCell.y,
+    path: [{ x: fromCell.x, y: fromCell.y }],
+    priority: 0,
+  }];
+  const seen = new Set([`${fromCell.x},${fromCell.y}`]);
+
+  while (queue.length > 0) {
+    queue.sort((a, b) => a.priority - b.priority);
+    const { x, y, path } = queue.shift();
+
+    if (x === toCell.x && y === toCell.y) {
+      for (let i = 0; i < path.length - 1; i++) {
+        const curr = path[i], next = path[i + 1];
+        const dx = next.x - curr.x, dy = next.y - curr.y;
+        const dir = dx === 1 ? 'right' : dx === -1 ? 'left' : dy === 1 ? 'bottom' : 'top';
+        grid[curr.y][curr.x].walls[dir] = false;
+        grid[next.y][next.x].walls[OPPOSITE[dir]] = false;
+        grid[curr.y][curr.x].visited = true;
+        grid[next.y][next.x].visited = true;
+        visitedCells.add(`${curr.x},${curr.y}`);
+        visitedCells.add(`${next.x},${next.y}`);
+      }
+      return path;
+    }
+
+    const dirs = ['top', 'right', 'bottom', 'left'];
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+
+    for (const dir of dirs) {
+      const nx = x + DIR_DX[dir], ny = y + DIR_DY[dir];
+      const nKey = `${nx},${ny}`;
+      if (seen.has(nKey)) continue;
+      if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) continue;
+      // Allow the target even if it's a stroke cell
+      if (nKey !== `${toCell.x},${toCell.y}` && allStrokeCells.has(nKey)) continue;
+      if (hasWall(fixedWalls, x, y, dir)) continue;
+      if (hasWall(fixedWalls, nx, ny, OPPOSITE[dir])) continue;
+      seen.add(nKey);
+      const priority = manhattanDist(nx, ny) + rng() * 2; // small random jitter
+      queue.push({ x: nx, y: ny, path: [...path, { x: nx, y: ny }], priority });
+    }
+  }
+
+  return null; // Grid is completely disconnected (extremely rare)
+}
+
 // --- Phase 5: Carve external path between letters (BFS) ---
-function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, visitedCells, allStrokeCells) {
+function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, visitedCells, allStrokeCells, rng) {
   // Helper to calculate Manhattan distance to target
   const manhattanDist = (x, y) => Math.abs(x - toCell.x) + Math.abs(y - toCell.y);
   const totalDistance = manhattanDist(fromCell.x, fromCell.y);
@@ -905,7 +963,7 @@ function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, vis
       const dirs = ['top', 'right', 'bottom', 'left'];
       if (randomScale > 0) {
         for (let i = dirs.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
+          const j = Math.floor(rng() * (i + 1));
           [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
         }
       }
@@ -931,7 +989,7 @@ function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, vis
         // Calculate priority: distance to target + random factor
         // Lower priority = explored first
         const distance = manhattanDist(nx, ny);
-        const randomFactor = Math.random() * currentMaxRandom;
+        const randomFactor = rng() * currentMaxRandom;
         const priority = distance + randomFactor;
 
         queue.push({ x: nx, y: ny, path: [...path, { x: nx, y: ny }], priority });
@@ -941,7 +999,9 @@ function carveExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, vis
     // If we got here, this attempt failed - try next attempt with less randomness
   }
 
-  return null; // No path found after all attempts
+  // Attempt 3: free-pass BFS — ignores visitedCells constraint.
+  // Works whenever the grid is connected through non-stroke cells.
+  return carveFreeExternalPath(grid, fixedWalls, fromCell, toCell, gridW, gridH, allStrokeCells, visitedCells, rng);
 }
 
 // --- Phase 6: Fill remaining space with maze ---
@@ -972,6 +1032,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
     contentHeight: layoutResult.contentHeight,
     paddingUnits: layoutResult.paddingUnits
   };
+
 
   if (characters.length === 0) {
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig };
@@ -1113,7 +1174,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
   const firstPair = entryExitPairs.find(pair => pair !== null);
   const startCorner = { x: 0, y: 0 };
   const pathToFirstLetter = firstPair
-    ? carveExternalPath(grid, fixedWalls, startCorner, { x: firstPair.entry.ox, y: firstPair.entry.oy }, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells)
+    ? carveExternalPath(grid, fixedWalls, startCorner, { x: firstPair.entry.ox, y: firstPair.entry.oy }, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells, rng)
     : null;
 
   // Phase 5b: Carve external paths between consecutive non-space letters
@@ -1141,7 +1202,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
     const fromCell = { x: exitPair.ox, y: exitPair.oy };
     const toCell = { x: entryPair.ox, y: entryPair.oy };
 
-    const path = carveExternalPath(grid, fixedWalls, fromCell, toCell, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells);
+    const path = carveExternalPath(grid, fixedWalls, fromCell, toCell, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells, rng);
     externalPaths.push(path);
   }
 
@@ -1150,7 +1211,7 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
   const lastPair = lastPairIdx !== undefined ? entryExitPairs[lastPairIdx] : null;
   const endCorner = { x: effectiveGridWidth - 1, y: gridHeight - 1 };
   const pathFromLastLetter = lastPair
-    ? carveExternalPath(grid, fixedWalls, { x: lastPair.exit.ox, y: lastPair.exit.oy }, endCorner, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells)
+    ? carveExternalPath(grid, fixedWalls, { x: lastPair.exit.ox, y: lastPair.exit.oy }, endCorner, effectiveGridWidth, gridHeight, visitedCells, allStrokeCells, rng)
     : null;
 
   // Build full solution path (from top-left corner to bottom-right corner)
