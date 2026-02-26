@@ -99,11 +99,17 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position
 
   const totalRows = currentRow + 1;
   const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
-  const { vFactor } = getPositionFactors(position);
+  // Track the widest row to compute horizontal free space
+  const maxUsedCols = tempLayout.length > 0
+    ? Math.max(...tempLayout.map(item => item.col + 1))
+    : 0;
+
+  const { hFactor, vFactor } = getPositionFactors(position);
   const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - totalRows) * vFactor);
+  const horizontalOffset = Math.floor(Math.max(0, charsPerRow - maxUsedCols) * hFactor);
 
   const characters = tempLayout.map((item, index) => {
-    const x = item.col * cellWidth;
+    const x = (item.col + horizontalOffset) * cellWidth;
     const y = (item.row + verticalOffset) * cellHeight;
 
     if ((x + cellWidth) > gridWidthUnits || (y + cellHeight) > gridHeightUnits) {
@@ -123,41 +129,34 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position
   };
 }
 
-// Compact mode: Each word on its own line, position-aware placement
+// Compact mode: Each word on its own line, using natural cell sizes.
+// The grid passed in is already sized to the text block (see SvgGrid.jsx),
+// which causes SvgGrid to scale px/unit upward so letters appear large.
+// Position controls where the text block sits within the (possibly wider/taller) grid.
 function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
+  const words = text.split(' ').filter(w => w.length > 0);
+  const longestWordLength = Math.max(...words.map(w => w.length), 1);
+  const numWords = words.length;
+
   const cellWidth = CHAR_CELL_WIDTH_UNITS;
   const cellHeight = CHAR_CELL_HEIGHT_UNITS;
-  const words = text.split(' ').filter(w => w.length > 0);
-
-  // Find longest word for horizontal centering
-  const longestWordLength = Math.max(...words.map(w => w.length), 1);
-
-  const tempLayout = [];
   const charsPerRow = longestWordLength;
 
-  // Place each word on its own line, centered
+  // Place each word on its own line, centered within the text block
+  const tempLayout = [];
   for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
     const word = words[wordIdx];
-    const wordLength = word.length;
-
-    // Center each word horizontally
-    const horizontalOffset = Math.floor((charsPerRow - wordLength) / 2);
-
-    for (let charIdx = 0; charIdx < wordLength; charIdx++) {
-      tempLayout.push({
-        char: word[charIdx],
-        row: wordIdx,
-        col: horizontalOffset + charIdx
-      });
+    const wordOffset = Math.floor((charsPerRow - word.length) / 2);
+    for (let charIdx = 0; charIdx < word.length; charIdx++) {
+      tempLayout.push({ char: word[charIdx], row: wordIdx, col: wordOffset + charIdx });
     }
   }
 
-  const totalRows = words.length;
   const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
   const charsPerGridRow = Math.floor(gridWidthUnits / cellWidth);
 
   const { hFactor, vFactor } = getPositionFactors(position);
-  const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - totalRows) * vFactor);
+  const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - numWords) * vFactor);
   const horizontalGridOffset = Math.floor(Math.max(0, charsPerGridRow - charsPerRow) * hFactor);
 
   const characters = tempLayout.map((item, index) => {

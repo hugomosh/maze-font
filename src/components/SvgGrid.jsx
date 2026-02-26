@@ -88,18 +88,37 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       actualMazeHeightUnits: 0,
     };
 
-    // All modes use the same full-canvas grid — the maze always fills the space.
-    // sizingMode and position control how the text block is placed within the grid.
-    const referenceSize = 800;
-    const targetUnitSize = 10;
-    const baseGrid = Math.floor(referenceSize / targetUnitSize);
-    const aspectRatio = width / height;
-    const gridWidthUnits = aspectRatio > 1
-      ? Math.floor(baseGrid * aspectRatio)
-      : baseGrid;
-    const gridHeightUnits = aspectRatio > 1
-      ? baseGrid
-      : Math.floor(baseGrid / aspectRatio);
+    // Compact mode: build a minimal grid sized to the text block, then extend one
+    // dimension to match the canvas aspect ratio so the maze fills the canvas.
+    // This causes SvgGrid to render at a larger px/unit → letters appear big
+    // while keeping natural cell proportions (no glyph compression).
+    // Standard/autofit: use a fixed reference-size grid that fills the canvas.
+    let gridWidthUnits, gridHeightUnits;
+    if (sizingMode === 'compact' && text.trim().length > 0) {
+      const words = text.split(' ').filter(w => w.length > 0);
+      const longestWordLen = Math.max(...words.map(w => w.length), 1);
+      const numWords = words.length;
+      const COMPACT_MARGIN = 1; // must match calculateCompactLayout MARGIN
+      const minGridW = (longestWordLen + COMPACT_MARGIN * 2) * CHAR_CELL_WIDTH_UNITS;
+      const minGridH = (numWords + COMPACT_MARGIN * 2) * CHAR_CELL_HEIGHT_UNITS;
+      const canvasAR = width / height;
+      if (minGridW / minGridH < canvasAR) {
+        // Canvas is wider than the text block → extend grid width
+        gridWidthUnits = Math.ceil(minGridH * canvasAR);
+        gridHeightUnits = minGridH;
+      } else {
+        // Canvas is taller than the text block → extend grid height
+        gridWidthUnits = minGridW;
+        gridHeightUnits = Math.ceil(minGridW / canvasAR);
+      }
+    } else {
+      const referenceSize = 800;
+      const targetUnitSize = 10;
+      const baseGrid = Math.floor(referenceSize / targetUnitSize);
+      const aspectRatio = width / height;
+      gridWidthUnits = aspectRatio > 1 ? Math.floor(baseGrid * aspectRatio) : baseGrid;
+      gridHeightUnits = aspectRatio > 1 ? baseGrid : Math.floor(baseGrid / aspectRatio);
+    }
 
     const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode, verticalBias, position);
 

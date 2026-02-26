@@ -853,8 +853,9 @@ describe('Word Maze - Multi Letter "LI"', () => {
 
 describe('Word Maze - Multi Letter "HELLO"', () => {
   it('generates maze with 5 letters, random gates, and connected external paths', () => {
-    const gridW = CHAR_CELL_WIDTH_UNITS * 5; // 50 (5 letters)
-    const gridH = CHAR_CELL_HEIGHT_UNITS;     // 14
+    // Grid must have room beyond the letter cells for external paths to route
+    const gridW = CHAR_CELL_WIDTH_UNITS * 5 + CHAR_CELL_WIDTH_UNITS * 4;
+    const gridH = CHAR_CELL_HEIGHT_UNITS * 3;
     const seed = 123;
     const rng = mulberry32(seed);
 
