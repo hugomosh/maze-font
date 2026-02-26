@@ -1,5 +1,6 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import SvgGrid from './SvgGrid';
+import { MazeGlyph } from './MazeGlyph';
 import './MazeGenerator.css';
 
 const SIZE_OPTIONS = [
@@ -116,7 +117,7 @@ const MazeGenerator = () => {
 
           {/* Brand — desktop only */}
           <div className="app-brand">
-            <h1 className="app-title">Maze Font</h1>
+            <MazeGlyph text="MAZE FONT" height={26} gap={2} />
           </div>
 
           {/* Text — desktop only */}
