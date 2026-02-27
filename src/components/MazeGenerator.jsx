@@ -40,7 +40,7 @@ const DEFAULT_TEXT = 'Hola Mundo! Hello World!';
 
 const MazeGenerator = () => {
   const params = new URLSearchParams(window.location.search);
-  const shouldAutoDownload = params.get('dl') === '1';
+  const [shouldAutoDownload] = useState(() => params.get('dl') === '1');
   const hasAutoDownloaded = useRef(false);
   const [text, setText] = useState(params.get('t') ?? DEFAULT_TEXT);
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
@@ -128,7 +128,9 @@ const MazeGenerator = () => {
             ? `maze-${text.replace(/\s+/g, '-').toLowerCase()}.png`
             : 'maze.png';
           link.href = URL.createObjectURL(pngBlob);
+          document.body.appendChild(link);
           link.click();
+          document.body.removeChild(link);
           URL.revokeObjectURL(url);
           URL.revokeObjectURL(link.href);
         });
