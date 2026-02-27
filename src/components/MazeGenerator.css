@@ -65,6 +65,61 @@
   color: #c0c0c0;
 }
 
+.ctrl-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.info-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.72rem;
+  color: #c8c8c8;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.12s;
+  font-family: inherit;
+}
+
+.info-btn:hover,
+.info-btn.active {
+  color: #6c5ce7;
+}
+
+.layout-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: #f8f8f8;
+  border: 1px solid #ebebeb;
+  border-radius: 7px;
+  padding: 0.5rem 0.6rem;
+}
+
+.layout-tip-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.layout-tip-row.current .layout-tip-name {
+  color: #6c5ce7;
+}
+
+.layout-tip-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #555;
+}
+
+.layout-tip-desc {
+  font-size: 0.68rem;
+  color: #999;
+  line-height: 1.35;
+}
+
 /* ════════════════════════════════════════════════════════
    Text input
 ════════════════════════════════════════════════════════ */
@@ -401,9 +456,9 @@
   max-width: 100%;
 }
 
-/* Compact mode — the format aspect ratio is still respected;
+/* Autofit mode — the format aspect ratio is still respected;
    only the internal maze layout changes (handled in SvgGrid) */
-.grid-container.compact-mode {
+.grid-container.autofit-mode {
   /* no overrides — format classes govern shape */
 }
 

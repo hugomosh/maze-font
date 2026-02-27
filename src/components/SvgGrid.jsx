@@ -75,7 +75,7 @@ function calculateOptimalUnitSize(text, width, height) {
   return MIN_UNIT_SIZE;
 }
 
-const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 'autofit', verticalBias = 1, position = 'center', theme = 'classic' }, ref) => {
+const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 'autofit', verticalBias = 1, position = 'center', theme = 'classic', regularWalls = false }, ref) => {
   const result = useMemo(() => {
     if (width === 0 || height === 0) return {
       glyphWalls: new Map(),
@@ -94,7 +94,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
     // while keeping natural cell proportions (no glyph compression).
     // Standard/autofit: use a fixed reference-size grid that fills the canvas.
     let gridWidthUnits, gridHeightUnits;
-    if (sizingMode === 'compact' && text.trim().length > 0) {
+    if (sizingMode === 'autofit' && text.trim().length > 0) {
       const words = text.split(' ').filter(w => w.length > 0);
       const longestWordLen = Math.max(...words.map(w => w.length), 1);
       const numWords = words.length;
@@ -242,17 +242,19 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       ))}
 
       {Array.from(glyphWalls.entries()).map(([charIndex, walls]) => {
-        const color = th.glyph !== null
-          ? th.glyph
-          : LETTER_COLORS[charIndex % LETTER_COLORS.length];
+        const color = regularWalls
+          ? th.maze
+          : (th.glyph !== null ? th.glyph : LETTER_COLORS[charIndex % LETTER_COLORS.length]);
+        const sw = regularWalls ? unitSize * 0.25 : unitSize * 0.3;
+        const cap = regularWalls ? 'square' : 'round';
         return walls.map(([x1, y1, x2, y2], i) => (
           <line
             key={`glyph-${charIndex}-${i}`}
             x1={x1 * unitSize} y1={y1 * unitSize}
             x2={x2 * unitSize} y2={y2 * unitSize}
             stroke={color}
-            strokeWidth={unitSize * 0.3}
-            strokeLinecap="round"
+            strokeWidth={sw}
+            strokeLinecap={cap}
           />
         ));
       })}

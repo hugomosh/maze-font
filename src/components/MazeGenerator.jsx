@@ -10,9 +10,9 @@ const SIZE_OPTIONS = [
 ];
 
 const SIZING_OPTIONS = [
-  { id: 'standard', label: 'Standard', title: 'Fixed cell size' },
-  { id: 'autofit',  label: 'Autofit',  title: 'Scale to fill space' },
-  { id: 'compact',  label: 'Compact',  title: 'Minimal padding' },
+  { id: 'standard', label: 'Standard', desc: 'Fixed cell size — letters stay the same scale regardless of canvas.' },
+  { id: 'compact',  label: 'Compact',  desc: 'Scale letters to fill the available space uniformly.' },
+  { id: 'autofit',  label: 'Autofit',  desc: 'Maximize letter size — grid fits tight to the text block.' },
 ];
 
 const BIAS_OPTIONS = [
@@ -38,7 +38,7 @@ const POS_GRID = [
 const MAX_CHARS = 20;
 
 const MazeGenerator = () => {
-  const [text, setText] = useState('Your Message Here');
+  const [text, setText] = useState('Hola Mundo! Hello World!');
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
   const [showPath, setShowPath] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('square');
@@ -46,6 +46,8 @@ const MazeGenerator = () => {
   const [verticalBias, setVerticalBias] = useState(1);
   const [textPosition, setTextPosition] = useState('center');
   const [theme, setTheme] = useState('classic');
+  const [regularWalls, setRegularWalls] = useState(false);
+  const [layoutTipOpen, setLayoutTipOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const gridRef = useRef(null);
   const svgRef = useRef(null);
@@ -204,17 +206,33 @@ const MazeGenerator = () => {
 
           {/* Layout */}
           <div className="ctrl-section">
-            <label className="ctrl-label">Layout</label>
+            <div className="ctrl-label-row">
+              <label className="ctrl-label">Layout</label>
+              <button
+                className={`info-btn${layoutTipOpen ? ' active' : ''}`}
+                onClick={() => setLayoutTipOpen(v => !v)}
+                aria-label="Layout mode info"
+              >ⓘ</button>
+            </div>
             <div className="segment-ctrl">
               {SIZING_OPTIONS.map(opt => (
                 <button
                   key={opt.id}
                   className={sizingMode === opt.id ? 'active' : ''}
-                  title={opt.title}
                   onClick={() => setSizingMode(opt.id)}
                 >{opt.label}</button>
               ))}
             </div>
+            {layoutTipOpen && (
+              <div className="layout-tip">
+                {SIZING_OPTIONS.map(opt => (
+                  <div key={opt.id} className={`layout-tip-row${sizingMode === opt.id ? ' current' : ''}`}>
+                    <span className="layout-tip-name">{opt.label}</span>
+                    <span className="layout-tip-desc">{opt.desc}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Corridors */}
@@ -229,6 +247,22 @@ const MazeGenerator = () => {
                   onClick={() => setVerticalBias(opt.id)}
                 >{opt.label}</button>
               ))}
+            </div>
+          </div>
+
+          {/* Regular walls toggle */}
+          <div className="ctrl-section">
+            <div
+              className="toggle-row"
+              role="button"
+              tabIndex={0}
+              onClick={() => setRegularWalls(v => !v)}
+              onKeyDown={e => e.key === ' ' && setRegularWalls(v => !v)}
+            >
+              <span className="toggle-label">Regular walls</span>
+              <span className={`toggle-sw${regularWalls ? ' on' : ''}`}>
+                <span className="toggle-thumb" />
+              </span>
             </div>
           </div>
 
@@ -282,7 +316,7 @@ const MazeGenerator = () => {
         {/* Grid */}
         <div className="grid-wrapper">
           <div
-            className={`grid-container ${aspectRatio}${sizingMode === 'compact' ? ' compact-mode' : ''}`}
+            className={`grid-container ${aspectRatio}${sizingMode === 'autofit' ? ' autofit-mode' : ''}`}
             ref={gridRef}
           >
             <SvgGrid
@@ -295,6 +329,7 @@ const MazeGenerator = () => {
               verticalBias={verticalBias}
               position={textPosition}
               theme={theme}
+              regularWalls={regularWalls}
             />
           </div>
         </div>

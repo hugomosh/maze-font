@@ -60,7 +60,7 @@ const DIR_DY = { top: -1, bottom: 1, left: 0, right: 0 };
 function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits, sizingMode = 'autofit', position = 'center') {
   if (sizingMode === 'standard') {
     return calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position);
-  } else if (sizingMode === 'compact') {
+  } else if (sizingMode === 'autofit') {
     return calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position);
   }
   return calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position);
@@ -1038,8 +1038,8 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig };
   }
 
-  // For compact mode, use the reduced grid width
-  const effectiveGridWidth = (sizingMode === 'compact' && layoutResult.compactGridWidth)
+  // For autofit mode, use the reduced grid width
+  const effectiveGridWidth = (sizingMode === 'autofit' && layoutResult.compactGridWidth)
     ? Math.ceil(layoutResult.compactGridWidth)
     : gridWidth;
 
