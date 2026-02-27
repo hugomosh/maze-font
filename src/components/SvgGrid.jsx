@@ -75,7 +75,7 @@ function calculateOptimalUnitSize(text, width, height) {
   return MIN_UNIT_SIZE;
 }
 
-const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 'autofit', verticalBias = 1, position = 'center', theme = 'classic', regularWalls = false }, ref) => {
+const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 'autofit', verticalBias = 1, position = 'center', theme = 'classic', regularWalls = false, textAlign = 'center' }, ref) => {
   const result = useMemo(() => {
     if (width === 0 || height === 0) return {
       glyphWalls: new Map(),
@@ -120,7 +120,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       gridHeightUnits = aspectRatio > 1 ? baseGrid : Math.floor(baseGrid / aspectRatio);
     }
 
-    const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode, verticalBias, position);
+    const wmResult = generateWordMaze(text, gridWidthUnits, gridHeightUnits, fontData, null, sizingMode, verticalBias, position, textAlign);
 
     // Calculate actual maze dimensions (compact mode may use less width)
     let actualMazeWidthUnits = gridWidthUnits;
@@ -208,7 +208,7 @@ const SvgGrid = React.forwardRef(({ width, height, text, showPath, sizingMode = 
       actualMazeWidthUnits,
       actualMazeHeightUnits,
     };
-  }, [width, height, text, sizingMode, verticalBias, position]);
+  }, [width, height, text, sizingMode, verticalBias, position, textAlign]);
 
   const { glyphWalls, mazeWalls, characters, solutionPath, unitSize, cellConfig, actualMazeWidthUnits, actualMazeHeightUnits } = result;
 

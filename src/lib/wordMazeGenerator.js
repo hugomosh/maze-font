@@ -57,17 +57,17 @@ const DIR_DX = { top: 0, bottom: 0, left: -1, right: 1 };
 const DIR_DY = { top: -1, bottom: 1, left: 0, right: 0 };
 
 // --- Phase 1: Calculate optimal cell size and layout characters ---
-function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits, sizingMode = 'autofit', position = 'center') {
+function calculateOptimalLayoutAndCellSize(text, gridWidthUnits, gridHeightUnits, sizingMode = 'autofit', position = 'center', textAlign = 'center') {
   if (sizingMode === 'standard') {
-    return calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position);
+    return calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position, textAlign);
   } else if (sizingMode === 'autofit') {
-    return calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position);
+    return calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position, textAlign);
   }
-  return calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position);
+  return calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position, textAlign);
 }
 
 // Standard mode: Fixed cell size, word wrapping, position-aware placement
-function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
+function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position = 'center', textAlign = 'center') {
   const cellWidth = CHAR_CELL_WIDTH_UNITS;
   const cellHeight = CHAR_CELL_HEIGHT_UNITS;
   const words = text.split(' ');
@@ -99,9 +99,14 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position
 
   const totalRows = currentRow + 1;
   const totalRowsInGrid = Math.floor(gridHeightUnits / cellHeight);
-  // Track the widest row to compute horizontal free space
-  const maxUsedCols = tempLayout.length > 0
-    ? Math.max(...tempLayout.map(item => item.col + 1))
+
+  // Per-row widths for alignment
+  const rowWidths = {};
+  for (const item of tempLayout) {
+    rowWidths[item.row] = Math.max(rowWidths[item.row] ?? 0, item.col + 1);
+  }
+  const maxUsedCols = Object.values(rowWidths).length > 0
+    ? Math.max(...Object.values(rowWidths))
     : 0;
 
   const { hFactor, vFactor } = getPositionFactors(position);
@@ -109,7 +114,11 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position
   const horizontalOffset = Math.floor(Math.max(0, charsPerRow - maxUsedCols) * hFactor);
 
   const characters = tempLayout.map((item, index) => {
-    const x = (item.col + horizontalOffset) * cellWidth;
+    const rowW = rowWidths[item.row] ?? 0;
+    const alignOffset = textAlign === 'left' ? 0
+      : textAlign === 'right' ? maxUsedCols - rowW
+      : Math.floor((maxUsedCols - rowW) / 2);
+    const x = (item.col + horizontalOffset + alignOffset) * cellWidth;
     const y = (item.row + verticalOffset) * cellHeight;
 
     if ((x + cellWidth) > gridWidthUnits || (y + cellHeight) > gridHeightUnits) {
@@ -133,7 +142,7 @@ function calculateStandardLayout(text, gridWidthUnits, gridHeightUnits, position
 // The grid passed in is already sized to the text block (see SvgGrid.jsx),
 // which causes SvgGrid to scale px/unit upward so letters appear large.
 // Position controls where the text block sits within the (possibly wider/taller) grid.
-function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
+function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position = 'center', textAlign = 'center') {
   const words = text.split(' ').filter(w => w.length > 0);
   const longestWordLength = Math.max(...words.map(w => w.length), 1);
   const numWords = words.length;
@@ -142,11 +151,13 @@ function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position 
   const cellHeight = CHAR_CELL_HEIGHT_UNITS;
   const charsPerRow = longestWordLength;
 
-  // Place each word on its own line, centered within the text block
+  // Place each word on its own line, aligned within the text block
   const tempLayout = [];
   for (let wordIdx = 0; wordIdx < words.length; wordIdx++) {
     const word = words[wordIdx];
-    const wordOffset = Math.floor((charsPerRow - word.length) / 2);
+    const wordOffset = textAlign === 'left' ? 0
+      : textAlign === 'right' ? charsPerRow - word.length
+      : Math.floor((charsPerRow - word.length) / 2);
     for (let charIdx = 0; charIdx < word.length; charIdx++) {
       tempLayout.push({ char: word[charIdx], row: wordIdx, col: wordOffset + charIdx });
     }
@@ -181,7 +192,7 @@ function calculateCompactLayout(text, gridWidthUnits, gridHeightUnits, position 
 }
 
 // Autofit mode: Scales cells to fit the longest line, position-aware vertical placement
-function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position = 'center') {
+function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position = 'center', textAlign = 'center') {
   // Try with maximum of 2 rows
   const MAX_ROWS = 2;
   const words = text.split(' ');
@@ -277,8 +288,19 @@ function calculateAutofitLayout(text, gridWidthUnits, gridHeightUnits, position 
   const { vFactor } = getPositionFactors(position);
   const verticalOffset = Math.floor(Math.max(0, totalRowsInGrid - totalRows) * vFactor);
 
+  // Per-row widths for alignment
+  const rowWidths = {};
+  for (const item of finalLayout) {
+    rowWidths[item.row] = Math.max(rowWidths[item.row] ?? 0, item.col + 1);
+  }
+  const maxRowWidth = Object.values(rowWidths).length > 0 ? Math.max(...Object.values(rowWidths)) : 0;
+
   const characters = finalLayout.map((item, index) => {
-    const x = item.col * scaledCellWidthUnits;
+    const rowW = rowWidths[item.row] ?? 0;
+    const alignOffset = textAlign === 'left' ? 0
+      : textAlign === 'right' ? maxRowWidth - rowW
+      : Math.floor((maxRowWidth - rowW) / 2);
+    const x = (item.col + alignOffset) * scaledCellWidthUnits;
     const y = (item.row + verticalOffset) * scaledCellHeightUnits;
 
     if ((x + scaledCellWidthUnits) > gridWidthUnits || (y + scaledCellHeightUnits) > gridHeightUnits) {
@@ -1016,14 +1038,14 @@ function fillRemainingSpace(grid, fixedWalls, gridW, gridH, verticalBias = 1) {
 }
 
 // --- Main entry point ---
-export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit', verticalBias = 1, position = 'center') {
+export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, sizingMode = 'autofit', verticalBias = 1, position = 'center', textAlign = 'center') {
   if (!rng) rng = Math.random;
   if (!text || gridWidth <= 0 || gridHeight <= 0) {
     return { walls: [], solutionPath: [], characters: [], startCell: null, endCell: null, cellConfig: null };
   }
 
   // Phase 1: Calculate optimal cell size and layout characters (based on sizing mode)
-  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight, sizingMode, position);
+  const layoutResult = calculateOptimalLayoutAndCellSize(text, gridWidth, gridHeight, sizingMode, position, textAlign);
   const characters = layoutResult.characters;
   const cellConfig = {
     cellWidth: layoutResult.cellWidth,

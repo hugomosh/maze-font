@@ -46,6 +46,7 @@ const MazeGenerator = () => {
   const [verticalBias, setVerticalBias] = useState(1);
   const [textPosition, setTextPosition] = useState('center');
   const [theme, setTheme] = useState('classic');
+  const [textAlign, setTextAlign] = useState('center');
   const [regularWalls, setRegularWalls] = useState(false);
   const [layoutTipOpen, setLayoutTipOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -175,18 +176,35 @@ const MazeGenerator = () => {
             </div>
           </div>
 
-          {/* Position — 3×3 dot grid */}
+          {/* Position + Align — side by side */}
           <div className="ctrl-section">
-            <label className="ctrl-label">Position</label>
-            <div className="pos-grid">
-              {POS_GRID.map((row, r) => row.map(pos => (
-                <button
-                  key={pos}
-                  className={`pos-dot${textPosition === pos ? ' active' : ''}`}
-                  onClick={() => setTextPosition(pos)}
-                  title={pos.replace('-', ' ')}
-                />
-              )))}
+            <div className="pos-align-row">
+              <div className="pos-col">
+                <label className="ctrl-label">Position</label>
+                <div className="pos-grid">
+                  {POS_GRID.map((row, r) => row.map(pos => (
+                    <button
+                      key={pos}
+                      className={`pos-dot${textPosition === pos ? ' active' : ''}`}
+                      onClick={() => setTextPosition(pos)}
+                      title={pos.replace('-', ' ')}
+                    />
+                  )))}
+                </div>
+              </div>
+              <div className="align-col">
+                <label className="ctrl-label">Align</label>
+                <div className="align-ctrl">
+                  {['left', 'center', 'right'].map(align => (
+                    <button
+                      key={align}
+                      className={`align-btn align-btn--${align}${textAlign === align ? ' active' : ''}`}
+                      onClick={() => setTextAlign(align)}
+                      title={align}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -330,6 +348,7 @@ const MazeGenerator = () => {
               position={textPosition}
               theme={theme}
               regularWalls={regularWalls}
+              textAlign={textAlign}
             />
           </div>
         </div>

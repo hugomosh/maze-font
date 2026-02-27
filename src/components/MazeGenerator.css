@@ -232,8 +232,21 @@
 }
 
 /* ════════════════════════════════════════════════════════
-   Position grid
+   Position grid + Alignment — two-column row
 ════════════════════════════════════════════════════════ */
+
+.pos-align-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.pos-col,
+.align-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
 
 .pos-grid {
   display: grid;
@@ -263,6 +276,49 @@
   background: linear-gradient(135deg, #4ecdc4, #45b7d1);
   border-color: #4ecdc4;
 }
+
+/* Alignment buttons — match the 3-row height of the pos-grid */
+.align-ctrl {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.align-btn {
+  width: 26px;
+  height: 24px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 4px;
+  background: #f5f5f5;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.align-btn:hover  { border-color: #4ecdc4; background: #e8faf9; }
+.align-btn.active { border-color: #4ecdc4; background: linear-gradient(135deg, #4ecdc4, #45b7d1); }
+
+/* Three horizontal bars via ::before + two box-shadows */
+.align-btn::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 3px;
+  height: 2px;
+  width: 65%;
+  border-radius: 1px;
+  background: #c0c0c0;
+  box-shadow: 0 5px 0 #c0c0c0, 0 10px 0 #c0c0c0;
+}
+.align-btn.active::before {
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 5px 0 rgba(255,255,255,0.85), 0 10px 0 rgba(255,255,255,0.85);
+}
+
+.align-btn--left::before   { left: 4px; }
+.align-btn--center::before { left: 50%; transform: translateX(-50%); }
+.align-btn--right::before  { right: 4px; }
 
 /* ════════════════════════════════════════════════════════
    Segmented control
