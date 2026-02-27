@@ -1245,7 +1245,6 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
   }
 
   // Path through each letter
-  let pathIndex = 0;
   for (let i = 0; i < characters.length; i++) {
     if (!entryExitPairs[i]) continue;
     const pair = entryExitPairs[i];
@@ -1256,11 +1255,10 @@ export function generateWordMaze(text, gridWidth, gridHeight, fontData, rng, siz
     }
     // Outside exit cell
     solutionPath.push({ x: pair.exit.ox, y: pair.exit.oy });
-    // External path to next letter (use pathIndex to track external paths)
-    if (pathIndex < externalPaths.length && externalPaths[pathIndex]) {
-      solutionPath.push(...externalPaths[pathIndex]);
+    // External path to next letter — indexed by i since externalPaths has one entry per character
+    if (i < externalPaths.length && externalPaths[i]) {
+      solutionPath.push(...externalPaths[i]);
     }
-    pathIndex++;
   }
 
   // End at bottom-right corner
