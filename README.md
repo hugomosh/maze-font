@@ -1,42 +1,142 @@
-# Maze Font & Generator
+# Maze Font Generator
 
-## Project Overview
+Renders text as a continuous solvable maze. Each letter is drawn as maze corridors; letters connect seamlessly into one traversable path that visits every character in sequence.
 
-This project explores a unique concept: a "maze font" where each character glyph is represented as a miniature maze. Beyond simply displaying characters, the system aims to dynamically generate paths that connect these individual character-mazes, forming a continuous, solvable labyrinth composed of text.
+**Live:** https://hugomoran159.github.io/maze-font/
 
-The primary tool for this is a custom-built **Glyph Editor**, allowing for intuitive creation and modification of these maze-like characters.
+---
 
-## Features of the Glyph Editor
+## URL API
 
-The interactive Glyph Editor provides a comprehensive set of tools for designing and refining maze font glyphs:
+Everything is controlled through URL query parameters — no account, no form submission. Build a URL, share it, bookmark it, automate it.
 
-*   **Interactive Drawing (Diamond Grid):** Edit glyphs on a specialized diamond-node grid. Click to toggle horizontal or vertical wall segments, and drag the mouse for continuous drawing.
-*   **Visual Feedback:**
-    *   **Stroke Detection Visualization:** Clearly see different regions of the maze (outside, hole, enclosed corridor, potential stroke, connected stroke) highlighted with distinct colors, aiding in understanding the maze generation logic.
-    *   **Cell Coordinates:** Each grid cell displays its `(x,y)` coordinates, providing precise editing guidance.
-*   **Undo/Redo History:** Full history tracking for all editing actions, allowing for easy correction of mistakes.
-*   **Grab and Move:** Hold the spacebar to activate "grab" mode, then click and drag the entire glyph to reposition it on the canvas.
-*   **Import/Export:**
-    *   **Export:** Save your entire font set as a JSON file, preserving your custom glyphs.
-    *   **Import:** Load existing font definitions from a JSON file, enabling easy sharing and iteration.
-*   **Character Management:**
-    *   **Character Palette:** A visual display of all characters in your font set, allowing quick selection for editing.
-    *   **Add New Characters:** Easily add new characters to your font, starting with a blank canvas for fresh designs.
+```
+https://hugomoran159.github.io/maze-font/?t=Hello+World&theme=dark&seed=42
+```
+
+### Parameters
+
+| Param | Default | Values | Description |
+|---|---|---|---|
+| `t` | `Hola Mundo! Hello World!` | ≤ 20 chars, URI-encoded | Text to render as a maze |
+| `seed` | absent *(random)* | any integer | Seed the RNG — same seed always produces the same maze |
+| `ar` | `square` | `square` · `landscape` · `story` | Canvas aspect ratio |
+| `sz` | `autofit` | `autofit` · `standard` · `compact` | Layout / sizing mode |
+| `vb` | `1` | `1` · `3` · `8` | Vertical corridor bias |
+| `pos` | `center` | see below | Text position on canvas |
+| `theme` | `classic` | `classic` · `dark` · `mono` · `ink` | Color theme |
+| `align` | `center` | `left` · `center` · `right` | Text alignment within the block |
+| `rw` | absent | `1` | Regular walls — renders all walls the same color |
+| `path` | absent | `1` | Show the solution path overlay |
+| `dl` | absent | `1` | Auto-download PNG on page load |
+
+**Default values are omitted from the URL.** A fresh default state produces a clean URL with no query string.
+
+---
+
+### Aspect ratios (`ar`)
+
+| Value | Ratio | Use case |
+|---|---|---|
+| `square` | 1 : 1 | Profile pictures, prints |
+| `landscape` | 16 : 9 | Desktop wallpaper, presentations |
+| `story` | 9 : 16 | Mobile wallpaper, Instagram stories |
+
+### Layout modes (`sz`)
+
+| Value | Description |
+|---|---|
+| `autofit` | Maximizes letter size — grid fits tight to the text block |
+| `standard` | Fixed cell size — letters stay the same scale regardless of canvas size |
+| `compact` | Scale letters uniformly to fill the available space |
+
+### Text position (`pos`)
+
+9-point grid:
+
+```
+top-left    top    top-right
+left        center      right
+bottom-left bottom bottom-right
+```
+
+### Vertical bias (`vb`)
+
+| Value | Label | Effect |
+|---|---|---|
+| `1` | Normal | Uniform random corridors |
+| `3` | Vertical | Prefer vertical runs |
+| `8` | Strong | Strongly vertical corridors |
+
+### Color themes (`theme`)
+
+| Value | Background | Walls | Letters |
+|---|---|---|---|
+| `classic` | Off-white | Light gray | Rainbow per letter |
+| `dark` | Dark navy | Dark blue | Rainbow per letter |
+| `mono` | White | Light gray | Dark slate |
+| `ink` | White | Medium gray | Black |
+
+---
+
+### Auto-download (`dl=1`)
+
+Adding `?dl=1` causes the PNG to download automatically as soon as the maze finishes rendering. Combine with `seed` for fully reproducible, scriptable output:
+
+```
+?t=Hello+World&seed=42&dl=1
+```
+
+The page renders, the PNG downloads at ≥ 2048 px on the long edge, done. Works in any browser. For headless / CI use, pair with a tool like Puppeteer that can open a URL and wait for the download.
+
+`dl` is a one-shot trigger — it is not persisted in the URL after firing.
+
+---
+
+## Examples
+
+```
+# Dark theme, landscape, seeded
+?t=MAZE+FONT&theme=dark&ar=landscape&seed=1337
+
+# Story format, top-left, show solution path
+?t=Hello&ar=story&pos=top-left&path=1
+
+# Compact layout, vertical corridors, monochrome walls
+?t=HELLO+WORLD&sz=compact&vb=8&rw=1
+
+# Download immediately — deterministic
+?t=Open+Sesame&seed=999&dl=1
+```
+
+---
 
 ## Getting Started
 
-To set up and run the project locally:
+```bash
+npm install
+npm run dev      # dev server at http://localhost:5173/maze-font/
+npm test         # run test suite (Vitest)
+npm run build    # production build → dist/
+npm run deploy   # build + push to GitHub Pages
+```
 
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
-2.  **Start the Development Server:**
-    ```bash
-    npm run dev
-    ```
-    The application will open in your browser, typically at `http://localhost:5173/`.
+---
 
-## Future Enhancements (TODO)
+## Architecture
 
-*   **Path Generation Between Letters:** Implement an algorithm to automatically generate visually appealing and solvable maze paths that seamlessly connect one character-maze to the next, forming a continuous, readable maze from a given string of text. This involves analyzing the entry and exit points of each character's maze and finding optimal connections.
+| File | Role |
+|---|---|
+| `src/components/MazeGenerator.jsx` | App shell — URL param sync, download handler, UI controls |
+| `src/components/SvgGrid.jsx` | SVG renderer, maze layout, theming |
+| `src/lib/wordMazeGenerator.js` | Core maze generation algorithm |
+| `src/lib/mazeGenerator.js` | Recursive backtracker (background fill) |
+| `src/lib/rng.js` | `mulberry32` seeded PRNG |
+| `src/assets/maze-font.json` | Font glyph data — wall segments `[x1,y1,x2,y2]` per character |
+| `src/components/GlyphEditor.jsx` | Interactive font editor |
+
+---
+
+## License
+
+[CC-BY-NC-SA-4.0](LICENSE)

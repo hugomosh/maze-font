@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import SvgGrid from './SvgGrid';
 import { MazeGlyph } from './MazeGlyph';
 import './MazeGenerator.css';
@@ -36,18 +36,25 @@ const POS_GRID = [
 ];
 
 const MAX_CHARS = 20;
+const DEFAULT_TEXT = 'Hola Mundo! Hello World!';
 
 const MazeGenerator = () => {
-  const [text, setText] = useState('Hola Mundo! Hello World!');
+  const params = new URLSearchParams(window.location.search);
+  const shouldAutoDownload = params.get('dl') === '1';
+  const hasAutoDownloaded = useRef(false);
+  const [text, setText] = useState(params.get('t') ?? DEFAULT_TEXT);
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
-  const [showPath, setShowPath] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState('square');
-  const [sizingMode, setSizingMode] = useState('autofit');
-  const [verticalBias, setVerticalBias] = useState(1);
-  const [textPosition, setTextPosition] = useState('center');
-  const [theme, setTheme] = useState('classic');
-  const [textAlign, setTextAlign] = useState('center');
-  const [regularWalls, setRegularWalls] = useState(false);
+  const [showPath, setShowPath] = useState(params.get('path') === '1');
+  const [aspectRatio, setAspectRatio] = useState(params.get('ar') ?? 'square');
+  const [sizingMode, setSizingMode] = useState(params.get('sz') ?? 'autofit');
+  const [verticalBias, setVerticalBias] = useState(Number(params.get('vb') ?? 1));
+  const [textPosition, setTextPosition] = useState(params.get('pos') ?? 'center');
+  const [theme, setTheme] = useState(params.get('theme') ?? 'classic');
+  const [textAlign, setTextAlign] = useState(params.get('align') ?? 'center');
+  const [regularWalls, setRegularWalls] = useState(params.get('rw') === '1');
+  const [seed, setSeed] = useState(() => {
+    const v = params.get('seed'); return v !== null ? parseInt(v, 10) : null;
+  });
   const [layoutTipOpen, setLayoutTipOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const gridRef = useRef(null);
@@ -62,6 +69,22 @@ const MazeGenerator = () => {
     ro.observe(gridRef.current);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (text !== DEFAULT_TEXT)     p.set('t', text);
+    if (aspectRatio !== 'square')  p.set('ar', aspectRatio);
+    if (sizingMode !== 'autofit')  p.set('sz', sizingMode);
+    if (verticalBias !== 1)        p.set('vb', verticalBias);
+    if (textPosition !== 'center') p.set('pos', textPosition);
+    if (theme !== 'classic')       p.set('theme', theme);
+    if (textAlign !== 'center')    p.set('align', textAlign);
+    if (regularWalls)              p.set('rw', '1');
+    if (showPath)                  p.set('path', '1');
+    if (seed !== null)             p.set('seed', seed);
+    const qs = p.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+  }, [text, aspectRatio, sizingMode, verticalBias, textPosition, theme, textAlign, regularWalls, showPath, seed]);
 
   const handleChange = e => {
     if (e.target.value.length <= MAX_CHARS) setText(e.target.value);
@@ -115,6 +138,13 @@ const MazeGenerator = () => {
       console.error('Download error:', err);
     }
   };
+
+  useEffect(() => {
+    if (!shouldAutoDownload || hasAutoDownloaded.current) return;
+    if (!svgRef.current || gridSize.width === 0) return;
+    hasAutoDownloaded.current = true;
+    handleDownload();
+  }, [gridSize, shouldAutoDownload]);
 
   return (
     <div className="maze-app">
@@ -349,6 +379,7 @@ const MazeGenerator = () => {
               theme={theme}
               regularWalls={regularWalls}
               textAlign={textAlign}
+              seed={seed}
             />
           </div>
         </div>
