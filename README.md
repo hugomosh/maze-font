@@ -2,7 +2,7 @@
 
 Renders text as a continuous solvable maze. Each letter is drawn as maze corridors; letters connect seamlessly into one traversable path that visits every character in sequence.
 
-**Live:** https://hugomoran159.github.io/maze-font/
+**Live:** https://hugomosh.github.io/maze-font/
 
 ---
 
