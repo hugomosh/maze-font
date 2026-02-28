@@ -8,7 +8,7 @@
 //
 // The CSV must have a "nombre" header column (case-insensitive).
 // Produces one PNG per name × style combination, e.g.:
-//   output/kawa_classic.png  output/kawa_dark.png  …
+//   output/friend_classic.png  output/friend_dark.png  …
 
 import { readFileSync, mkdirSync } from 'fs';
 import { resolve, join } from 'path';
@@ -56,6 +56,7 @@ const STYLES = [
   { id: 'classic',      theme: 'classic', showPath: false, regularWalls: false },
   { id: 'dark',         theme: 'dark',    showPath: false, regularWalls: false },
   { id: 'classic-path', theme: 'classic', showPath: true,  regularWalls: false },
+  { id: 'ink',          theme: 'ink',     showPath: false, regularWalls: false },
   { id: 'ink-walls',    theme: 'ink',     showPath: false, regularWalls: true  },
 ];
 
@@ -185,30 +186,71 @@ function buildSvg(wmResult, style) {
 }
 
 // ---------------------------------------------------------------------------
-// CSV parser
+// CSV helpers
 // ---------------------------------------------------------------------------
-function parseNames(csvPath) {
+
+/** Parse one CSV line respecting double-quoted fields (handles commas and spaces inside quotes). */
+function parseCSVLine(line) {
+  const fields = [];
+  let inQuote = false;
+  let current = '';
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuote = !inQuote;
+    } else if (ch === ',' && !inQuote) {
+      fields.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
+/**
+ * Transliterate accented characters.
+ * If the font has a glyph for the character (e.g. Ñ), keep it as-is.
+ * Otherwise strip the diacritic to get the ASCII base letter (á→a, é→e, …).
+ */
+function transliterate(str) {
+  return [...str].map(ch => {
+    if (fontData[ch.toUpperCase()]) return ch;           // font supports it — keep
+    return ch.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // strip diacritic
+  }).join('');
+}
+
+/** Parse CSV, returning { nombre, canonicalId } per data row. */
+function parseCSV(csvPath) {
   const csv = readFileSync(resolve(csvPath), 'utf8');
   const lines = csv.split('\n').map(l => l.replace(/\r$/, ''));
   if (lines.length === 0) { console.error('Error: CSV is empty'); process.exit(1); }
 
-  const header = lines[0].toLowerCase().split(',');
-  const nombreIdx = header.findIndex(h => h.trim() === 'nombre');
+  const header = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+  const nombreIdx    = header.findIndex(h => h === 'nombre');
+  const canonicalIdx = header.findIndex(h => h === 'canonical_id');
+
   if (nombreIdx === -1) {
     console.error('Error: CSV must have a "nombre" column in the header row');
     process.exit(1);
   }
 
   return lines.slice(1)
-    .map(l => l.split(',')[nombreIdx]?.trim())
+    .map(l => {
+      const fields = parseCSVLine(l);
+      const nombre = fields[nombreIdx]?.trim();
+      const canonicalId = canonicalIdx !== -1 ? fields[canonicalIdx]?.trim() : null;
+      return nombre ? { nombre, canonicalId } : null;
+    })
     .filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
-// Name → safe filename
+// Name → safe filename (transliterate first so é→e in filenames too)
 // ---------------------------------------------------------------------------
 function normalizeName(name) {
-  return name.toLowerCase()
+  return transliterate(name)
+    .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
 }
@@ -217,23 +259,32 @@ function normalizeName(name) {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
-  const [,, csvPath = 'names.csv', outDir = 'output', seedArg = '42'] = process.argv;
-  const baseSeed = parseInt(seedArg, 10) || 42;
+  const [,, csvPath = 'names.csv', outDir = 'output', fallbackSeed = '42'] = process.argv;
+  const baseSeed = parseInt(fallbackSeed, 10) || 42;
 
-  const names = parseNames(csvPath);
+  const entries = parseCSV(csvPath);
   mkdirSync(resolve(outDir), { recursive: true });
 
-  const total = names.length;
+  const total = entries.length;
   const startTime = Date.now();
 
   for (let i = 0; i < total; i++) {
-    const name = names[i];
-    const normalized = normalizeName(name);
+    const { nombre, canonicalId } = entries[i];
 
-    const { gridW, gridH } = computeGridSize(name);
-    const rng = mulberry32(baseSeed + i);
+    // canonical_id is written in base 3 — parse it to get a base-10 integer seed.
+    // e.g. '102100102' (base 3) → 8273 (base 10)
+    const seed = (canonicalId && /^[012]+$/.test(canonicalId))
+      ? parseInt(canonicalId, 3)   // base-3 string → base-10 number
+      : baseSeed + i;
+
+    // Transliterate accents before passing to the maze generator
+    const mazeName = transliterate(nombre);
+    const normalized = normalizeName(nombre);
+
+    const { gridW, gridH } = computeGridSize(mazeName);
+    const rng = mulberry32(seed);
     const wmResult = generateWordMaze(
-      name, gridW, gridH, fontData, rng,
+      mazeName, gridW, gridH, fontData, rng,
       'autofit', 1, 'center', 'center',
     );
 
@@ -246,7 +297,7 @@ async function main() {
       filenames.push(filename);
     }
 
-    process.stdout.write(`[${i + 1}/${total}] ${name} → ${filenames.join('  ')}\n`);
+    process.stdout.write(`[${i + 1}/${total}] ${nombre} (seed ${seed}) → ${filenames.join('  ')}\n`);
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
