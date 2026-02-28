@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "generate": "node --loader ./scripts/loader.mjs scripts/generate-batch.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.563.0",
@@ -30,6 +31,7 @@
     "gh-pages": "^6.3.0",
     "globals": "^16.5.0",
     "jsdom": "^28.0.0",
+    "sharp": "^0.34.5",
     "vite": "^7.2.4",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.0.18"
