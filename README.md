@@ -11,7 +11,7 @@ Renders text as a continuous solvable maze. Each letter is drawn as maze corrido
 Everything is controlled through URL query parameters — no account, no form submission. Build a URL, share it, bookmark it, automate it.
 
 ```
-https://hugomoran159.github.io/maze-font/?t=Hello+World&theme=dark&seed=42
+https://hugomosh.github.io/maze-font/?t=Hello+World&theme=dark&seed=42
 ```
 
 ### Parameters
