@@ -16,6 +16,7 @@ import { createRequire } from 'module';
 import sharp from 'sharp';
 import { generateWordMaze } from '../src/lib/wordMazeGenerator.js';
 import { mulberry32 } from '../src/lib/rng.js';
+import { buildSvgString } from '../src/lib/svgBuilder.js';
 
 // JSON import via createRequire — works in Node 18+ without import assertions
 const _require = createRequire(import.meta.url);
@@ -35,29 +36,15 @@ const COMPACT_MARGIN = 1;
 const TARGET_PX = 1200;
 
 // ---------------------------------------------------------------------------
-// Themes — must match SvgGrid.jsx THEMES
-// ---------------------------------------------------------------------------
-const THEMES = {
-  classic: { bg: '#fdfdfd', maze: '#d4d4d4', glyph: null },
-  dark:    { bg: '#1a1a2e', maze: '#2d3561', glyph: null },
-  mono:    { bg: '#ffffff', maze: '#e0e0e0', glyph: '#2c3e50' },
-  ink:     { bg: '#ffffff', maze: '#aaaaaa', glyph: '#000000' },
-};
-
-const LETTER_COLORS = [
-  '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7',
-  '#a29bfe', '#fd79a8', '#fdcb6e', '#55efc4', '#74b9ff',
-];
-
-// ---------------------------------------------------------------------------
-// Style config — edit this array to add/remove output variants
+// Style config — each entry is a full renderOptions object
 // ---------------------------------------------------------------------------
 const STYLES = [
-  { id: 'classic',      theme: 'classic', showPath: false, regularWalls: false },
-  { id: 'dark',         theme: 'dark',    showPath: false, regularWalls: false },
-  { id: 'classic-path', theme: 'classic', showPath: true,  regularWalls: false },
-  { id: 'ink',          theme: 'ink',     showPath: false, regularWalls: false },
-  { id: 'ink-walls',    theme: 'ink',     showPath: false, regularWalls: true  },
+  { id: 'classic',      theme: 'classic', showPath: false, regularWalls: false, handDrawn: false, pathColor: '#ff6b6b', pathWidth: 1.0 },
+  { id: 'dark',         theme: 'dark',    showPath: false, regularWalls: false, handDrawn: false, pathColor: '#ff6b6b', pathWidth: 1.0 },
+  { id: 'classic-path', theme: 'classic', showPath: true,  regularWalls: false, handDrawn: true,  pathColor: '#ff6b6b', pathWidth: 1.0 },
+  { id: 'dark-path',    theme: 'dark',    showPath: true,  regularWalls: false, handDrawn: true,  pathColor: '#74b9ff', pathWidth: 1.0 },
+  { id: 'ink',          theme: 'ink',     showPath: false, regularWalls: false, handDrawn: false, pathColor: '#ff6b6b', pathWidth: 1.0 },
+  { id: 'ink-walls',    theme: 'ink',     showPath: false, regularWalls: true,  handDrawn: false, pathColor: '#ff6b6b', pathWidth: 1.0 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -72,117 +59,6 @@ function computeGridSize(text) {
   // Square: extend the shorter dimension to match the longer one
   const gridUnits = Math.max(minGridW, minGridH);
   return { gridW: gridUnits, gridH: gridUnits };
-}
-
-// ---------------------------------------------------------------------------
-// SVG builder — port of SvgGrid useMemo rendering, pure string output
-// ---------------------------------------------------------------------------
-function buildSvg(wmResult, style) {
-  const th = THEMES[style.theme] ?? THEMES.classic;
-
-  // Step 1: Build potential glyph walls from fontData per character
-  const potentialGlyphWalls = new Map();
-  wmResult.characters.forEach((charInfo, index) => {
-    const charData = fontData[charInfo.char.toUpperCase()];
-    if (!charData) { potentialGlyphWalls.set(index, []); return; }
-    const walls = [];
-    for (const [x1, y1, x2, y2] of charData) {
-      const gx1 = charInfo.x + x1, gy1 = charInfo.y + y1;
-      const gx2 = charInfo.x + x2, gy2 = charInfo.y + y2;
-      if (gx1 === gx2) {
-        const minY = Math.min(gy1, gy2), maxY = Math.max(gy1, gy2);
-        for (let gy = minY; gy < maxY; gy++) walls.push([gx1, gy, gx1, gy + 1]);
-      } else if (gy1 === gy2) {
-        const minX = Math.min(gx1, gx2), maxX = Math.max(gx1, gx2);
-        for (let gx = minX; gx < maxX; gx++) walls.push([gx, gy1, gx + 1, gy1]);
-      }
-    }
-    potentialGlyphWalls.set(index, walls);
-  });
-
-  // Step 2: Intersect with finalWallSet → glyphWalls
-  const finalWallSet = new Set(wmResult.walls.map(w => w.join(',')));
-  const glyphWalls = new Map();
-  for (const [idx, walls] of potentialGlyphWalls) {
-    glyphWalls.set(idx, walls.filter(w => finalWallSet.has(w.join(','))));
-  }
-
-  // Step 3: glyphWallSet → mazeWalls (all non-glyph walls)
-  const glyphWallSet = new Set();
-  for (const walls of glyphWalls.values())
-    for (const w of walls) glyphWallSet.add(w.join(','));
-  const mazeWalls = wmResult.walls.filter(w => !glyphWallSet.has(w.join(',')));
-
-  // Step 4: Compute actual maze extents → unitSize
-  let maxX = 0, maxY = 0;
-  for (const [x1, y1, x2, y2] of wmResult.walls) {
-    if (x1 > maxX) maxX = x1; if (x2 > maxX) maxX = x2;
-    if (y1 > maxY) maxY = y1; if (y2 > maxY) maxY = y2;
-  }
-  const unitSize = TARGET_PX / Math.max(maxX, maxY, 1);
-  const svgW = (maxX * unitSize).toFixed(2);
-  const svgH = (maxY * unitSize).toFixed(2);
-
-  // Step 5: Build SVG string
-  const lines = [];
-  lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}">`);
-  lines.push(`<rect width="${svgW}" height="${svgH}" fill="${th.bg}"/>`);
-
-  // Maze walls — square linecap, width 0.25u
-  const mw = (unitSize * 0.25).toFixed(3);
-  for (const [x1, y1, x2, y2] of mazeWalls) {
-    lines.push(
-      `<line x1="${(x1 * unitSize).toFixed(2)}" y1="${(y1 * unitSize).toFixed(2)}"` +
-      ` x2="${(x2 * unitSize).toFixed(2)}" y2="${(y2 * unitSize).toFixed(2)}"` +
-      ` stroke="${th.maze}" stroke-width="${mw}" stroke-linecap="square"/>`
-    );
-  }
-
-  // Glyph walls — colored / mono, round linecap, width 0.3u (or 0.25u for regularWalls)
-  for (const [charIdx, walls] of glyphWalls) {
-    const color = style.regularWalls
-      ? th.maze
-      : (th.glyph !== null ? th.glyph : LETTER_COLORS[charIdx % LETTER_COLORS.length]);
-    const sw = (style.regularWalls ? unitSize * 0.25 : unitSize * 0.3).toFixed(3);
-    const cap = style.regularWalls ? 'square' : 'round';
-    for (const [x1, y1, x2, y2] of walls) {
-      lines.push(
-        `<line x1="${(x1 * unitSize).toFixed(2)}" y1="${(y1 * unitSize).toFixed(2)}"` +
-        ` x2="${(x2 * unitSize).toFixed(2)}" y2="${(y2 * unitSize).toFixed(2)}"` +
-        ` stroke="${color}" stroke-width="${sw}" stroke-linecap="${cap}"/>`
-      );
-    }
-  }
-
-  // Solution path (polyline + start/end markers)
-  const solutionPath = wmResult.solutionPath ?? [];
-  if (style.showPath && solutionPath.length > 1) {
-    const pts = solutionPath
-      .map(({ x, y }) => `${((x + 0.5) * unitSize).toFixed(2)},${((y + 0.5) * unitSize).toFixed(2)}`)
-      .join(' ');
-    lines.push(
-      `<polyline points="${pts}" fill="none" stroke="#ff6b6b"` +
-      ` stroke-width="${(unitSize * 0.15).toFixed(3)}"` +
-      ` stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`
-    );
-    // Start marker (green)
-    const sx = ((solutionPath[0].x + 0.5) * unitSize).toFixed(2);
-    const sy = ((solutionPath[0].y + 0.5) * unitSize).toFixed(2);
-    lines.push(
-      `<circle cx="${sx}" cy="${sy}" r="${(unitSize * 0.3).toFixed(3)}"` +
-      ` fill="#51cf66" stroke="#2b8a3e" stroke-width="${(unitSize * 0.1).toFixed(3)}"/>`
-    );
-    // End marker (red)
-    const ex = ((solutionPath[solutionPath.length - 1].x + 0.5) * unitSize).toFixed(2);
-    const ey = ((solutionPath[solutionPath.length - 1].y + 0.5) * unitSize).toFixed(2);
-    lines.push(
-      `<circle cx="${ex}" cy="${ey}" r="${(unitSize * 0.3).toFixed(3)}"` +
-      ` fill="#ff6b6b" stroke="#c92a2a" stroke-width="${(unitSize * 0.1).toFixed(3)}"/>`
-    );
-  }
-
-  lines.push('</svg>');
-  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -272,9 +148,8 @@ async function main() {
     const { nombre, canonicalId } = entries[i];
 
     // canonical_id is written in base 3 — parse it to get a base-10 integer seed.
-    // e.g. '102100102' (base 3) → 8273 (base 10)
     const seed = (canonicalId && /^[012]+$/.test(canonicalId))
-      ? parseInt(canonicalId, 3)   // base-3 string → base-10 number
+      ? parseInt(canonicalId, 3)
       : baseSeed + i;
 
     // Transliterate accents before passing to the maze generator
@@ -282,17 +157,30 @@ async function main() {
     const normalized = normalizeName(nombre);
 
     const { gridW, gridH } = computeGridSize(mazeName);
-    const rng = mulberry32(seed);
+    const mazeRng = mulberry32(seed);
     const wmResult = generateWordMaze(
-      mazeName, gridW, gridH, fontData, rng,
+      mazeName, gridW, gridH, fontData, mazeRng,
       'autofit', 1, 'center', 'center',
     );
 
+    // Compute layout — caller's responsibility in the shared library model
+    let maxX = 0, maxY = 0;
+    for (const [x1, y1, x2, y2] of wmResult.walls) {
+      if (x1 > maxX) maxX = x1; if (x2 > maxX) maxX = x2;
+      if (y1 > maxY) maxY = y1; if (y2 > maxY) maxY = y2;
+    }
+    const unitSize = TARGET_PX / Math.max(maxX, maxY, 1);
+    const svgW = maxX * unitSize;
+    const svgH = maxY * unitSize;
+
     const filenames = [];
     for (const style of STYLES) {
+      // Separate jitter RNG per style so hand-drawn paths are reproducible
+      const jitterRng = mulberry32((seed ^ 0x5EED) >>> 0);
+
       const filename = `${normalized}_${style.id}.png`;
       const outPath = join(resolve(outDir), filename);
-      const svgStr = buildSvg(wmResult, style);
+      const svgStr = buildSvgString(wmResult, fontData, style, svgW, svgH, unitSize, 0, 0, jitterRng);
       await sharp(Buffer.from(svgStr)).png().toFile(outPath);
       filenames.push(filename);
     }

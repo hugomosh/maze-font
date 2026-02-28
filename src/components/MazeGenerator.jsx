@@ -28,6 +28,12 @@ const THEME_OPTIONS = [
   { id: 'ink',     label: 'Ink' },
 ];
 
+const PATH_WIDTH_OPTIONS = [
+  { id: 0.6, label: 'Thin' },
+  { id: 1.0, label: 'Normal' },
+  { id: 1.6, label: 'Thick' },
+];
+
 // 3×3 position grid — row-major order
 const POS_GRID = [
   ['top-left',    'top',    'top-right'],
@@ -52,6 +58,13 @@ const MazeGenerator = () => {
   const [theme, setTheme] = useState(params.get('theme') ?? 'classic');
   const [textAlign, setTextAlign] = useState(params.get('align') ?? 'center');
   const [regularWalls, setRegularWalls] = useState(params.get('rw') === '1');
+  const [handDrawn, setHandDrawn] = useState(params.get('hd') === '1');
+  const [pathColor, setPathColor] = useState(() => {
+    const v = params.get('pc'); return v ? `#${v}` : '#ff6b6b';
+  });
+  const [pathWidth, setPathWidth] = useState(() => {
+    const v = params.get('pw'); return v ? parseFloat(v) : 1.0;
+  });
   const [seed, setSeed] = useState(() => {
     const v = params.get('seed'); return v !== null ? parseInt(v, 10) : null;
   });
@@ -81,10 +94,14 @@ const MazeGenerator = () => {
     if (textAlign !== 'center')    p.set('align', textAlign);
     if (regularWalls)              p.set('rw', '1');
     if (showPath)                  p.set('path', '1');
+    if (handDrawn)                 p.set('hd', '1');
+    if (pathColor !== '#ff6b6b')   p.set('pc', pathColor.replace('#', ''));
+    if (pathWidth !== 1.0)         p.set('pw', pathWidth);
     if (seed !== null)             p.set('seed', seed);
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
-  }, [text, aspectRatio, sizingMode, verticalBias, textPosition, theme, textAlign, regularWalls, showPath, seed]);
+  }, [text, aspectRatio, sizingMode, verticalBias, textPosition, theme, textAlign,
+      regularWalls, showPath, handDrawn, pathColor, pathWidth, seed]);
 
   const handleChange = e => {
     if (e.target.value.length <= MAX_CHARS) setText(e.target.value);
@@ -93,9 +110,10 @@ const MazeGenerator = () => {
   const handleDownload = async () => {
     if (!svgRef.current) return;
     try {
-      const svg = svgRef.current;
-      const srcW = svg.width.baseVal.value;
-      const srcH = svg.height.baseVal.value;
+      const svgEl = svgRef.current.querySelector('svg');
+      if (!svgEl) return;
+      const srcW = svgEl.width.baseVal.value;
+      const srcH = svgEl.height.baseVal.value;
 
       // Scale up so the longer edge is at least 2048px
       const EXPORT_MIN_PX = 2048;
@@ -103,11 +121,7 @@ const MazeGenerator = () => {
       const canvasW = Math.round(srcW * scale);
       const canvasH = Math.round(srcH * scale);
 
-      // Clone SVG and stamp explicit export dimensions so the browser
-      // rasterises it at full resolution rather than screen size.
-      // viewBox locks the content coordinate space to the original screen
-      // dimensions so the SVG renderer scales it up proportionally.
-      const clone = svg.cloneNode(true);
+      const clone = svgEl.cloneNode(true);
       clone.setAttribute('viewBox', `0 0 ${srcW} ${srcH}`);
       clone.setAttribute('width', canvasW);
       clone.setAttribute('height', canvasH);
@@ -147,6 +161,8 @@ const MazeGenerator = () => {
     hasAutoDownloaded.current = true;
     handleDownload();
   }, [gridSize, shouldAutoDownload]);
+
+  const renderOptions = { theme, showPath, regularWalls, handDrawn, pathColor, pathWidth };
 
   return (
     <div className="maze-app">
@@ -316,7 +332,7 @@ const MazeGenerator = () => {
             </div>
           </div>
 
-          {/* Show path toggle */}
+          {/* Show path toggle + sub-options */}
           <div className="ctrl-section">
             <div
               className="toggle-row"
@@ -330,6 +346,52 @@ const MazeGenerator = () => {
                 <span className="toggle-thumb" />
               </span>
             </div>
+
+            {showPath && (
+              <div className="path-options">
+                {/* Hand-drawn toggle */}
+                <div
+                  className="toggle-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setHandDrawn(v => !v)}
+                  onKeyDown={e => e.key === ' ' && setHandDrawn(v => !v)}
+                >
+                  <span className="toggle-label toggle-label--sub">Hand-drawn</span>
+                  <span className={`toggle-sw${handDrawn ? ' on' : ''}`}>
+                    <span className="toggle-thumb" />
+                  </span>
+                </div>
+
+                {/* Color picker */}
+                <div className="path-color-row">
+                  <span className="toggle-label toggle-label--sub">Color</span>
+                  <label className="color-swatch-label">
+                    <input
+                      type="color"
+                      value={pathColor}
+                      onChange={e => setPathColor(e.target.value)}
+                      className="color-swatch-input"
+                    />
+                    <span className="color-swatch-preview" style={{ background: pathColor }} />
+                  </label>
+                </div>
+
+                {/* Width segmented control */}
+                <div className="path-width-row">
+                  <span className="toggle-label toggle-label--sub">Width</span>
+                  <div className="segment-ctrl segment-ctrl--compact">
+                    {PATH_WIDTH_OPTIONS.map(opt => (
+                      <button
+                        key={opt.id}
+                        className={pathWidth === opt.id ? 'active' : ''}
+                        onClick={() => setPathWidth(opt.id)}
+                      >{opt.label}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Download */}
@@ -374,12 +436,10 @@ const MazeGenerator = () => {
               width={gridSize.width}
               height={gridSize.height}
               text={text}
-              showPath={showPath}
+              renderOptions={renderOptions}
               sizingMode={sizingMode}
               verticalBias={verticalBias}
               position={textPosition}
-              theme={theme}
-              regularWalls={regularWalls}
               textAlign={textAlign}
               seed={seed}
             />
