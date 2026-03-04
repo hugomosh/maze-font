@@ -41,7 +41,7 @@ const POS_GRID = [
   ['bottom-left', 'bottom', 'bottom-right'],
 ];
 
-const MAX_CHARS = 20;
+const MAX_CHARS = 30;
 const DEFAULT_TEXT = 'Hola Mundo! Hello World!';
 
 const MazeGenerator = () => {
@@ -208,6 +208,7 @@ const MazeGenerator = () => {
                 type="text"
                 value={text}
                 onChange={handleChange}
+                onFocus={e => e.target.select()}
                 placeholder="Enter your message..."
                 className="maze-input"
               />
