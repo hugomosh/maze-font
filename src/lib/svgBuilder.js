@@ -142,6 +142,7 @@ export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, un
     handDrawn = false,
     pathColor = '#ff6b6b',
     pathWidth = 1.0,
+    pathOpacity = 1.0,
   } = renderOptions ?? {};
 
   const th = THEMES[theme] ?? THEMES.classic;
@@ -186,12 +187,13 @@ export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, un
   // Solution path
   if (showPath && solutionPath.length > 1) {
     const strokeW = (unitSize * 0.15 * pathWidth).toFixed(3);
+    const op = Number(pathOpacity).toFixed(3);
 
     if (handDrawn && rng) {
       const d = buildHandDrawnPathD(solutionPath, unitSize, rng);
       lines.push(
         `<path d="${d}" fill="none" stroke="${pathColor}"` +
-        ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`
+        ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`
       );
     } else {
       const pts = solutionPath
@@ -199,7 +201,7 @@ export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, un
         .join(' ');
       lines.push(
         `<polyline points="${pts}" fill="none" stroke="${pathColor}"` +
-        ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`
+        ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`
       );
     }
 
@@ -289,6 +291,7 @@ export function buildPathLayerSvg(wmResult, renderOptions, svgW, svgH, unitSize,
     handDrawn = false,
     pathColor = '#ff6b6b',
     pathWidth = 1.0,
+    pathOpacity = 1.0,
   } = renderOptions ?? {};
 
   const solutionPath = wmResult.solutionPath ?? [];
@@ -303,11 +306,12 @@ export function buildPathLayerSvg(wmResult, renderOptions, svgW, svgH, unitSize,
   lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`);
   lines.push(`<g transform="translate(${f(offsetX)},${f(offsetY)})">`);
 
+  const op = Number(pathOpacity).toFixed(3);
   if (handDrawn && rng) {
     const d = buildHandDrawnPathD(solutionPath, unitSize, rng);
     lines.push(
       `<path d="${d}" fill="none" stroke="${pathColor}"` +
-      ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`
+      ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`
     );
   } else {
     const pts = solutionPath
@@ -315,7 +319,7 @@ export function buildPathLayerSvg(wmResult, renderOptions, svgW, svgH, unitSize,
       .join(' ');
     lines.push(
       `<polyline points="${pts}" fill="none" stroke="${pathColor}"` +
-      ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`
+      ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="${op}"/>`
     );
   }
 

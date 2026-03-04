@@ -568,6 +568,78 @@
   padding: 0 1px;
 }
 
+/* Opacity slider — same layout as width slider */
+.path-opacity-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.path-opacity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.path-opacity-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  display: block;
+}
+
+.path-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4ecdc4, #45b7d1);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.path-opacity-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(78,205,196,0.4);
+}
+
+.path-opacity-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4ecdc4, #45b7d1);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  cursor: pointer;
+}
+
+.path-opacity-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #e0e0e0;
+}
+
+/* Checkerboard hint (transparent area) + teal fill up to thumb */
+.path-opacity-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background:
+    linear-gradient(
+      to right,
+      #4ecdc4 0%,
+      #4ecdc4 calc(var(--val, 1) * 100%),
+      #e0e0e0 calc(var(--val, 1) * 100%)
+    );
+}
+
 /* ════════════════════════════════════════════════════════
    Download button
 ════════════════════════════════════════════════════════ */

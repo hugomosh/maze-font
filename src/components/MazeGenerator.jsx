@@ -65,6 +65,9 @@ const MazeGenerator = () => {
   const [pathColor, setPathColor] = useState(() => {
     const v = params.get('pc'); return v ? `#${v}` : '#ff6b6b';
   });
+  const [pathOpacity, setPathOpacity] = useState(() => {
+    const v = params.get('po'); return v ? parseFloat(v) : 1.0;
+  });
   // pathWidth: two states — live (immediate slider display) + debounced (feeds renderOptions)
   const [pathWidthLive, setPathWidthLive] = useState(() => {
     const v = params.get('pw'); return v ? parseFloat(v) : 1.0;
@@ -114,11 +117,12 @@ const MazeGenerator = () => {
     if (handDrawn)                 p.set('hd', '1');
     if (pathColor !== '#ff6b6b')   p.set('pc', pathColor.replace('#', ''));
     if (pathWidth !== 1.0)         p.set('pw', pathWidth);
+    if (pathOpacity !== 1.0)       p.set('po', pathOpacity);
     if (seed !== null)             p.set('seed', seed);
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
   }, [text, aspectRatio, sizingMode, verticalBias, textPosition, theme, textAlign,
-      regularWalls, showPath, handDrawn, pathColor, pathWidth, seed]);
+      regularWalls, showPath, handDrawn, pathColor, pathOpacity, pathWidth, seed]);
 
   const handleChange = e => {
     const val = e.target.value;
@@ -183,7 +187,7 @@ const MazeGenerator = () => {
     handleDownload();
   }, [gridSize, shouldAutoDownload]);
 
-  const renderOptions = { theme, showPath, regularWalls, handDrawn, pathColor, pathWidth };
+  const renderOptions = { theme, showPath, regularWalls, handDrawn, pathColor, pathOpacity, pathWidth };
 
   return (
     <div className="maze-app">
@@ -385,7 +389,7 @@ const MazeGenerator = () => {
                   </span>
                 </div>
 
-                {/* Color picker */}
+                {/* Color + Opacity */}
                 <div className="path-color-row">
                   <span className="toggle-label toggle-label--sub">Color</span>
                   <label className="color-swatch-label">
@@ -397,6 +401,22 @@ const MazeGenerator = () => {
                     />
                     <span className="color-swatch-preview" style={{ background: pathColor }} />
                   </label>
+                </div>
+                <div className="path-opacity-row">
+                  <div className="path-opacity-header">
+                    <span className="toggle-label toggle-label--sub">Opacity</span>
+                    <span className="path-width-value">{Math.round(pathOpacity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    className="path-opacity-slider"
+                    style={{ '--val': pathOpacity }}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={pathOpacity}
+                    onChange={e => setPathOpacity(parseFloat(e.target.value))}
+                  />
                 </div>
 
                 {/* Width slider */}

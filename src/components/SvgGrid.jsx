@@ -39,6 +39,7 @@ const SvgGrid = React.forwardRef(({
     regularWalls = false,
     handDrawn    = false,
     pathColor    = '#ff6b6b',
+    pathOpacity  = 1.0,
     pathWidth    = 1.0,
   } = renderOptions ?? {};
 
@@ -112,10 +113,10 @@ const SvgGrid = React.forwardRef(({
     // Recreate jitter RNG from the stable seed so wobble is deterministic.
     const jitterRng = mulberry32(jitterSeed);
     return buildPathLayerSvg(
-      wmResult, { showPath, handDrawn, pathColor, pathWidth },
+      wmResult, { showPath, handDrawn, pathColor, pathOpacity, pathWidth },
       svgW, svgH, unitSize, offsetX, offsetY, jitterRng,
     );
-  }, [mazeData, showPath, handDrawn, pathColor, pathWidth]);
+  }, [mazeData, showPath, handDrawn, pathColor, pathOpacity, pathWidth]);
 
   return (
     <div ref={ref} style={{ position: 'relative', lineHeight: 0 }}>
