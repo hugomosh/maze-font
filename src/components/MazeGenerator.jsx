@@ -48,7 +48,10 @@ const MazeGenerator = () => {
   const params = new URLSearchParams(window.location.search);
   const [shouldAutoDownload] = useState(() => params.get('dl') === '1');
   const hasAutoDownloaded = useRef(false);
-  const [text, setText] = useState(params.get('t') ?? DEFAULT_TEXT);
+  // text: two states — live (immediate input display) + debounced (triggers maze regen)
+  const [textLive, setTextLive] = useState(params.get('t') ?? DEFAULT_TEXT);
+  const [text, setText] = useState(textLive);
+  const textTimerRef = useRef(null);
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
   const [showPath, setShowPath] = useState(params.get('path') === '1');
   const [aspectRatio, setAspectRatio] = useState(params.get('ar') ?? 'square');
@@ -91,8 +94,11 @@ const MazeGenerator = () => {
     return () => ro.disconnect();
   }, []);
 
-  // Clean up the debounce timer on unmount
-  useEffect(() => () => clearTimeout(pathWidthTimerRef.current), []);
+  // Clean up debounce timers on unmount
+  useEffect(() => () => {
+    clearTimeout(textTimerRef.current);
+    clearTimeout(pathWidthTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const p = new URLSearchParams();
@@ -115,7 +121,11 @@ const MazeGenerator = () => {
       regularWalls, showPath, handDrawn, pathColor, pathWidth, seed]);
 
   const handleChange = e => {
-    if (e.target.value.length <= MAX_CHARS) setText(e.target.value);
+    const val = e.target.value;
+    if (val.length > MAX_CHARS) return;
+    setTextLive(val);
+    clearTimeout(textTimerRef.current);
+    textTimerRef.current = setTimeout(() => setText(val), 350);
   };
 
   const handleDownload = async () => {
@@ -206,13 +216,13 @@ const MazeGenerator = () => {
             <div className="text-input-group">
               <input
                 type="text"
-                value={text}
+                value={textLive}
                 onChange={handleChange}
                 onFocus={e => e.target.select()}
                 placeholder="Enter your message..."
                 className="maze-input"
               />
-              <span className="char-badge">{text.length}/{MAX_CHARS}</span>
+              <span className="char-badge">{textLive.length}/{MAX_CHARS}</span>
             </div>
           </div>
 
@@ -432,12 +442,13 @@ const MazeGenerator = () => {
         <div className="mobile-text-bar">
           <input
             type="text"
-            value={text}
+            value={textLive}
             onChange={handleChange}
+            onFocus={e => e.target.select()}
             placeholder="Enter your message..."
             className="maze-input"
           />
-          <span className="char-badge">{text.length}/{MAX_CHARS}</span>
+          <span className="char-badge">{textLive.length}/{MAX_CHARS}</span>
         </div>
 
         {/* Sheet overlay */}
