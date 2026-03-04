@@ -225,3 +225,115 @@ export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, un
   lines.push('</svg>');
   return lines.join('\n');
 }
+
+// ---------------------------------------------------------------------------
+// Layered rendering — maze walls and path as separate SVG strings.
+// SvgGrid stacks them so only the cheap path layer rerenders on slider drag.
+// ---------------------------------------------------------------------------
+
+/**
+ * Build only the background + wall layers (no path).
+ * Dependencies: wmResult, fontData, theme, regularWalls, dimensions.
+ */
+export function buildMazeLayerSvg(wmResult, fontData, renderOptions, svgW, svgH, unitSize, offsetX, offsetY) {
+  const { theme = 'classic', regularWalls = false } = renderOptions ?? {};
+  const th = THEMES[theme] ?? THEMES.classic;
+  const { glyphWalls, mazeWalls } = classifyWalls(wmResult, fontData);
+
+  const W = Number(svgW).toFixed(2);
+  const H = Number(svgH).toFixed(2);
+  const f = v => Number(v).toFixed(2);
+  const mw = (unitSize * 0.25).toFixed(3);
+
+  const lines = [];
+  lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`);
+  lines.push(`<rect width="${W}" height="${H}" fill="${th.bg}"/>`);
+  lines.push(`<g transform="translate(${f(offsetX)},${f(offsetY)})">`);
+
+  for (const [x1, y1, x2, y2] of mazeWalls) {
+    lines.push(
+      `<line x1="${f(x1 * unitSize)}" y1="${f(y1 * unitSize)}"` +
+      ` x2="${f(x2 * unitSize)}" y2="${f(y2 * unitSize)}"` +
+      ` stroke="${th.maze}" stroke-width="${mw}" stroke-linecap="square"/>`
+    );
+  }
+
+  for (const [charIdx, walls] of glyphWalls) {
+    const color = regularWalls
+      ? th.maze
+      : (th.glyph !== null ? th.glyph : LETTER_COLORS[charIdx % LETTER_COLORS.length]);
+    const sw = (regularWalls ? unitSize * 0.25 : unitSize * 0.3).toFixed(3);
+    const cap = regularWalls ? 'square' : 'round';
+    for (const [x1, y1, x2, y2] of walls) {
+      lines.push(
+        `<line x1="${f(x1 * unitSize)}" y1="${f(y1 * unitSize)}"` +
+        ` x2="${f(x2 * unitSize)}" y2="${f(y2 * unitSize)}"` +
+        ` stroke="${color}" stroke-width="${sw}" stroke-linecap="${cap}"/>`
+      );
+    }
+  }
+
+  lines.push('</g>');
+  lines.push('</svg>');
+  return lines.join('\n');
+}
+
+/**
+ * Build only the path + markers layer (transparent background).
+ * Returns empty string when showPath is false or path is too short.
+ * Dependencies: wmResult, showPath, handDrawn, pathColor, pathWidth, rng, dimensions.
+ */
+export function buildPathLayerSvg(wmResult, renderOptions, svgW, svgH, unitSize, offsetX, offsetY, rng) {
+  const {
+    showPath = false,
+    handDrawn = false,
+    pathColor = '#ff6b6b',
+    pathWidth = 1.0,
+  } = renderOptions ?? {};
+
+  const solutionPath = wmResult.solutionPath ?? [];
+  if (!showPath || solutionPath.length < 2) return '';
+
+  const W = Number(svgW).toFixed(2);
+  const H = Number(svgH).toFixed(2);
+  const f = v => Number(v).toFixed(2);
+  const strokeW = (unitSize * 0.15 * pathWidth).toFixed(3);
+
+  const lines = [];
+  lines.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`);
+  lines.push(`<g transform="translate(${f(offsetX)},${f(offsetY)})">`);
+
+  if (handDrawn && rng) {
+    const d = buildHandDrawnPathD(solutionPath, unitSize, rng);
+    lines.push(
+      `<path d="${d}" fill="none" stroke="${pathColor}"` +
+      ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>`
+    );
+  } else {
+    const pts = solutionPath
+      .map(({ x, y }) => `${f((x + 0.5) * unitSize)},${f((y + 0.5) * unitSize)}`)
+      .join(' ');
+    lines.push(
+      `<polyline points="${pts}" fill="none" stroke="${pathColor}"` +
+      ` stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`
+    );
+  }
+
+  const sx = f((solutionPath[0].x + 0.5) * unitSize);
+  const sy = f((solutionPath[0].y + 0.5) * unitSize);
+  lines.push(
+    `<circle cx="${sx}" cy="${sy}" r="${(unitSize * 0.3).toFixed(3)}"` +
+    ` fill="#51cf66" stroke="#2b8a3e" stroke-width="${(unitSize * 0.1).toFixed(3)}"/>`
+  );
+
+  const last = solutionPath[solutionPath.length - 1];
+  lines.push(
+    `<circle cx="${f((last.x + 0.5) * unitSize)}" cy="${f((last.y + 0.5) * unitSize)}"` +
+    ` r="${(unitSize * 0.3).toFixed(3)}" fill="#ff6b6b" stroke="#c92a2a"` +
+    ` stroke-width="${(unitSize * 0.1).toFixed(3)}"/>`
+  );
+
+  lines.push('</g>');
+  lines.push('</svg>');
+  return lines.join('\n');
+}

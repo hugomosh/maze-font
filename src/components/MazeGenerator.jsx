@@ -28,11 +28,11 @@ const THEME_OPTIONS = [
   { id: 'ink',     label: 'Ink' },
 ];
 
-const PATH_WIDTH_OPTIONS = [
-  { id: 0.6, label: 'Thin' },
-  { id: 1.0, label: 'Normal' },
-  { id: 1.6, label: 'Thick' },
-];
+// pathWidth is a multiplier: stroke = unitSize * 0.15 * pathWidth
+// pathWidth ≈ 6.67 fills one corridor unit (full cell width)
+const PATH_WIDTH_MIN = 0.2;
+const PATH_WIDTH_MAX = 8.0;
+const PATH_WIDTH_STEP = 0.1;
 
 // 3×3 position grid — row-major order
 const POS_GRID = [
@@ -62,9 +62,17 @@ const MazeGenerator = () => {
   const [pathColor, setPathColor] = useState(() => {
     const v = params.get('pc'); return v ? `#${v}` : '#ff6b6b';
   });
-  const [pathWidth, setPathWidth] = useState(() => {
+  // pathWidth: two states — live (immediate slider display) + debounced (feeds renderOptions)
+  const [pathWidthLive, setPathWidthLive] = useState(() => {
     const v = params.get('pw'); return v ? parseFloat(v) : 1.0;
   });
+  const [pathWidth, setPathWidth] = useState(pathWidthLive);
+  const pathWidthTimerRef = useRef(null);
+  const handlePathWidthChange = (val) => {
+    setPathWidthLive(val);
+    clearTimeout(pathWidthTimerRef.current);
+    pathWidthTimerRef.current = setTimeout(() => setPathWidth(val), 150);
+  };
   const [seed, setSeed] = useState(() => {
     const v = params.get('seed'); return v !== null ? parseInt(v, 10) : null;
   });
@@ -82,6 +90,9 @@ const MazeGenerator = () => {
     ro.observe(gridRef.current);
     return () => ro.disconnect();
   }, []);
+
+  // Clean up the debounce timer on unmount
+  useEffect(() => () => clearTimeout(pathWidthTimerRef.current), []);
 
   useEffect(() => {
     const p = new URLSearchParams();
@@ -377,17 +388,26 @@ const MazeGenerator = () => {
                   </label>
                 </div>
 
-                {/* Width segmented control */}
+                {/* Width slider */}
                 <div className="path-width-row">
-                  <span className="toggle-label toggle-label--sub">Width</span>
-                  <div className="segment-ctrl segment-ctrl--compact">
-                    {PATH_WIDTH_OPTIONS.map(opt => (
-                      <button
-                        key={opt.id}
-                        className={pathWidth === opt.id ? 'active' : ''}
-                        onClick={() => setPathWidth(opt.id)}
-                      >{opt.label}</button>
-                    ))}
+                  <div className="path-width-header">
+                    <span className="toggle-label toggle-label--sub">Width</span>
+                    <span className="path-width-value">{pathWidthLive.toFixed(1)}×</span>
+                  </div>
+                  <input
+                    type="range"
+                    className="path-width-slider"
+                    style={{ '--val': pathWidthLive }}
+                    min={PATH_WIDTH_MIN}
+                    max={PATH_WIDTH_MAX}
+                    step={PATH_WIDTH_STEP}
+                    value={pathWidthLive}
+                    onChange={e => handlePathWidthChange(parseFloat(e.target.value))}
+                  />
+                  <div className="path-width-ticks">
+                    <span>Thin</span>
+                    <span>Fill</span>
+                    <span>Bold</span>
                   </div>
                 </div>
               </div>
