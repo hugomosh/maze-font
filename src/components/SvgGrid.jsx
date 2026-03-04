@@ -34,7 +34,7 @@ const SvgGrid = React.forwardRef(({
 }, ref) => {
   // Destructure so each memo gets stable primitive dependencies.
   const {
-    theme        = 'classic',
+    palette      = 'vivid',
     showPath     = false,
     regularWalls = false,
     handDrawn    = false,
@@ -95,15 +95,15 @@ const SvgGrid = React.forwardRef(({
   }, [width, height, text, sizingMode, verticalBias, position, textAlign, seed]);
 
   // ── Memo 2: maze walls SVG (cheap) ───────────────────────────────────────
-  // Reruns only when the maze or visual theme changes — NOT on path changes.
+  // Reruns only when the maze or visual palette changes — NOT on path changes.
   const mazeSvgStr = useMemo(() => {
     if (!mazeData) return '';
     const { wmResult, unitSize, offsetX, offsetY, svgW, svgH } = mazeData;
     return buildMazeLayerSvg(
-      wmResult, fontData, { theme, regularWalls },
+      wmResult, fontData, { palette, regularWalls },
       svgW, svgH, unitSize, offsetX, offsetY,
     );
-  }, [mazeData, theme, regularWalls]);
+  }, [mazeData, palette, regularWalls]);
 
   // ── Memo 3: path layer SVG (cheap) ───────────────────────────────────────
   // Reruns only on path option changes — the maze is untouched.

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import SvgGrid from './SvgGrid';
 import { MazeGlyph } from './MazeGlyph';
+import { PALETTES } from '../lib/svgBuilder';
 import './MazeGenerator.css';
 
 const SIZE_OPTIONS = [
@@ -21,11 +22,15 @@ const BIAS_OPTIONS = [
   { id: 8, label: 'Strong',   title: 'Strong vertical bias' },
 ];
 
-const THEME_OPTIONS = [
-  { id: 'classic', label: 'Classic' },
-  { id: 'dark',    label: 'Dark' },
-  { id: 'mono',    label: 'Mono' },
-  { id: 'ink',     label: 'Ink' },
+const PALETTE_OPTIONS = [
+  { id: 'vivid',     label: 'Vivid' },
+  { id: 'dark',      label: 'Dark' },
+  { id: 'neon',      label: 'Neon' },
+  { id: 'pastel',    label: 'Pastel' },
+  { id: 'earth',     label: 'Earth' },
+  { id: 'mono',      label: 'Mono' },
+  { id: 'ink',       label: 'Ink' },
+  { id: 'blueprint', label: 'Blueprint' },
 ];
 
 // pathWidth is a multiplier: stroke = unitSize * 0.15 * pathWidth
@@ -58,7 +63,10 @@ const MazeGenerator = () => {
   const [sizingMode, setSizingMode] = useState(params.get('sz') ?? 'autofit');
   const [verticalBias, setVerticalBias] = useState(Number(params.get('vb') ?? 1));
   const [textPosition, setTextPosition] = useState(params.get('pos') ?? 'center');
-  const [theme, setTheme] = useState(params.get('theme') ?? 'classic');
+  const [palette, setPalette] = useState(() => {
+    const raw = params.get('palette') ?? params.get('theme') ?? 'vivid';
+    return raw === 'classic' ? 'vivid' : raw;
+  });
   const [textAlign, setTextAlign] = useState(params.get('align') ?? 'center');
   const [regularWalls, setRegularWalls] = useState(params.get('rw') === '1');
   const [handDrawn, setHandDrawn] = useState(params.get('hd') === '1');
@@ -110,7 +118,7 @@ const MazeGenerator = () => {
     if (sizingMode !== 'autofit')  p.set('sz', sizingMode);
     if (verticalBias !== 1)        p.set('vb', verticalBias);
     if (textPosition !== 'center') p.set('pos', textPosition);
-    if (theme !== 'classic')       p.set('theme', theme);
+    if (palette !== 'vivid')       p.set('palette', palette);
     if (textAlign !== 'center')    p.set('align', textAlign);
     if (regularWalls)              p.set('rw', '1');
     if (showPath)                  p.set('path', '1');
@@ -121,7 +129,7 @@ const MazeGenerator = () => {
     if (seed !== null)             p.set('seed', seed);
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
-  }, [text, aspectRatio, sizingMode, verticalBias, textPosition, theme, textAlign,
+  }, [text, aspectRatio, sizingMode, verticalBias, textPosition, palette, textAlign,
       regularWalls, showPath, handDrawn, pathColor, pathOpacity, pathWidth, seed]);
 
   const handleChange = e => {
@@ -187,7 +195,7 @@ const MazeGenerator = () => {
     handleDownload();
   }, [gridSize, shouldAutoDownload]);
 
-  const renderOptions = { theme, showPath, regularWalls, handDrawn, pathColor, pathOpacity, pathWidth };
+  const renderOptions = { palette, showPath, regularWalls, handDrawn, pathColor, pathOpacity, pathWidth };
 
   return (
     <div className="maze-app">
@@ -282,17 +290,29 @@ const MazeGenerator = () => {
             </div>
           </div>
 
-          {/* Style / theme */}
+          {/* Palette */}
           <div className="ctrl-section">
-            <label className="ctrl-label">Style</label>
-            <div className="segment-ctrl">
-              {THEME_OPTIONS.map(opt => (
-                <button
-                  key={opt.id}
-                  className={theme === opt.id ? 'active' : ''}
-                  onClick={() => setTheme(opt.id)}
-                >{opt.label}</button>
-              ))}
+            <label className="ctrl-label">Palette</label>
+            <div className="palette-cards">
+              {PALETTE_OPTIONS.map(opt => {
+                const p = PALETTES[opt.id];
+                const dots = p.glyph !== null ? [p.glyph] : (p.letterColors ?? []).slice(0, 3);
+                return (
+                  <button
+                    key={opt.id}
+                    className={`palette-card${palette === opt.id ? ' active' : ''}`}
+                    onClick={() => setPalette(opt.id)}
+                    title={opt.label}
+                  >
+                    <span className="palette-bg" style={{ background: p.bg }}>
+                      <span className="palette-dots">
+                        {dots.map((c, i) => <span key={i} className="palette-dot" style={{ background: c }} />)}
+                      </span>
+                    </span>
+                    <span className="palette-name">{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
