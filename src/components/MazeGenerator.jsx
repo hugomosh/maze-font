@@ -91,6 +91,7 @@ const MazeGenerator = () => {
     const v = params.get('seed'); return v !== null ? parseInt(v, 10) : null;
   });
   const [layoutTipOpen, setLayoutTipOpen] = useState(false);
+  const [corridorsTipOpen, setCorridorsTipOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const gridRef = useRef(null);
   const svgRef = useRef(null);
@@ -349,7 +350,21 @@ const MazeGenerator = () => {
 
           {/* Corridors */}
           <div className="ctrl-section">
-            <label className="ctrl-label">Corridors</label>
+            <div className="ctrl-label-row">
+              <label className="ctrl-label">Corridors</label>
+              <button
+                className={`info-btn${corridorsTipOpen ? ' active' : ''}`}
+                onClick={() => setCorridorsTipOpen(v => !v)}
+                aria-label="Corridors info"
+              >ⓘ</button>
+            </div>
+            {corridorsTipOpen && (
+              <div className="layout-tip">
+                <div className="layout-tip-row">
+                  <span className="layout-tip-desc">Controls how long vertical hallways grow. Higher bias = taller straight runs, giving the maze a more columnar feel.</span>
+                </div>
+              </div>
+            )}
             <div className="segment-ctrl">
               {BIAS_OPTIONS.map(opt => (
                 <button

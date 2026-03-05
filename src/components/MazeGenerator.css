@@ -34,7 +34,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
-  overflow: hidden; /* no scrollbar */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -795,11 +796,6 @@
 
   .ctrl-panel.open {
     transform: translateY(0);
-  }
-
-  /* Mobile: allow scrolling inside sheet if content is tall */
-  .ctrl-panel.open .ctrl-inner {
-    overflow-y: auto;
   }
 
   .sheet-handle-btn {
