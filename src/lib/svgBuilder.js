@@ -87,7 +87,12 @@ export function buildHandDrawnPathD(solutionPath, unitSize, rng) {
     y: (y + 0.5) * unitSize,
   }));
 
-  // Apply perpendicular jitter to each intermediate point
+  // Apply perpendicular jitter with an exponential moving average so adjacent
+  // points are correlated. Independent white noise produces rapid back-and-forth
+  // waggling on straight corridors; smoothed drift creates gentle curves instead.
+  const ALPHA = 0.6;  // smoothing: higher = slower drift changes (~1/(1-α) cell memory)
+  const AMP   = 0.22; // max jitter as fraction of unitSize
+  let drift = 0;
   const jittered = pts.map((p, i) => {
     if (i === 0 || i === pts.length - 1) return { ...p };
     const prev = pts[i - 1];
@@ -95,11 +100,10 @@ export function buildHandDrawnPathD(solutionPath, unitSize, rng) {
     const dx = next.x - prev.x;
     const dy = next.y - prev.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    // Perpendicular unit vector
     const px = -dy / len;
-    const py = dx / len;
-    const amount = (rng() - 0.5) * 2 * unitSize * 0.18;
-    return { x: p.x + px * amount, y: p.y + py * amount };
+    const py =  dx / len;
+    drift = drift * ALPHA + (rng() - 0.5) * 2 * (1 - ALPHA);
+    return { x: p.x + px * drift * unitSize * AMP, y: p.y + py * drift * unitSize * AMP };
   });
 
   // Catmull-Rom → Cubic Bezier conversion
