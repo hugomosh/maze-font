@@ -79,19 +79,31 @@ const SvgGrid = React.forwardRef(({
     );
 
     // Actual maze extents → unitSize and offsets
+    // SVG_MARGIN reserves space so outer wall strokes (0.25u wide) are never clipped.
+    const SVG_MARGIN = 4; // px — just enough to not clip the outer wall half-stroke
     let mazeW = gridWidthUnits, mazeH = gridHeightUnits;
     if (wmResult.walls.length > 0) {
       mazeW = Math.max(...wmResult.walls.map(([x1,,x2]) => Math.max(x1, x2)));
       mazeH = Math.max(...wmResult.walls.map(([,y1,,y2]) => Math.max(y1, y2)));
     }
-    const unitSize = Math.min(width / mazeW, height / mazeH);
-    const offsetX  = (width  - mazeW * unitSize) / 2;
-    const offsetY  = (height - mazeH * unitSize) / 2;
+    const unitSize = Math.min((width - 2 * SVG_MARGIN) / mazeW, (height - 2 * SVG_MARGIN) / mazeH);
+    const offsetX  = SVG_MARGIN + ((width  - 2 * SVG_MARGIN) - mazeW * unitSize) / 2;
+    const offsetY  = SVG_MARGIN + ((height - 2 * SVG_MARGIN) - mazeH * unitSize) / 2;
+
+    // Open entry (left wall of top-left cell) and exit (right wall of bottom-right cell).
+    const gateSet = new Set([
+      `0,0,0,1`,
+      `${mazeW},${mazeH - 1},${mazeW},${mazeH}`,
+    ]);
+    const wmForRender = {
+      ...wmResult,
+      walls: wmResult.walls.filter(w => !gateSet.has(w.join(','))),
+    };
 
     // Seed for the hand-drawn jitter RNG — stable across path-option changes.
     const jitterSeed = ((seed ?? fingerprint(wmResult.walls)) + 0x5EED) >>> 0;
 
-    return { wmResult, unitSize, offsetX, offsetY, jitterSeed, svgW: width, svgH: height };
+    return { wmResult: wmForRender, unitSize, offsetX, offsetY, jitterSeed, svgW: width, svgH: height };
   }, [width, height, text, sizingMode, verticalBias, position, textAlign, seed]);
 
   // ── Memo 2: maze walls SVG (cheap) ───────────────────────────────────────

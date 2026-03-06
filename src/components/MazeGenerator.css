@@ -692,7 +692,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.25rem;
+  padding: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -891,13 +891,13 @@
 ════════════════════════════════════════════════════════ */
 
 .palette-cards {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.35rem;
 }
 
 .palette-card {
-  flex: 0 0 calc(25% - 0.27rem);   /* 4 per row */
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -941,6 +941,10 @@
   color: #888;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .palette-card.active .palette-name { color: #4ecdc4; }

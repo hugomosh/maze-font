@@ -144,10 +144,12 @@ const MazeGenerator = () => {
   const handleDownload = async () => {
     if (!svgRef.current) return;
     try {
-      const svgEl = svgRef.current.querySelector('svg');
-      if (!svgEl) return;
-      const srcW = svgEl.width.baseVal.value;
-      const srcH = svgEl.height.baseVal.value;
+      // Two SVG layers: maze walls + optional path overlay — composite both.
+      const svgEls = svgRef.current.querySelectorAll('svg');
+      if (!svgEls.length) return;
+      const baseSvg = svgEls[0];
+      const srcW = baseSvg.width.baseVal.value;
+      const srcH = baseSvg.height.baseVal.value;
 
       // Scale up so the longer edge is at least 2048px
       const EXPORT_MIN_PX = 2048;
@@ -155,10 +157,17 @@ const MazeGenerator = () => {
       const canvasW = Math.round(srcW * scale);
       const canvasH = Math.round(srcH * scale);
 
-      const clone = svgEl.cloneNode(true);
+      const clone = baseSvg.cloneNode(true);
       clone.setAttribute('viewBox', `0 0 ${srcW} ${srcH}`);
       clone.setAttribute('width', canvasW);
       clone.setAttribute('height', canvasH);
+
+      // Append path layer children (if present) into the single export SVG.
+      if (svgEls.length > 1) {
+        for (const child of svgEls[1].children) {
+          clone.appendChild(child.cloneNode(true));
+        }
+      }
 
       const svgData = new XMLSerializer().serializeToString(clone);
       const canvas = document.createElement('canvas');

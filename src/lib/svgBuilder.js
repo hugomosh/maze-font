@@ -2,15 +2,14 @@
 // Shared SVG building utilities used by SvgGrid.jsx and generate-batch.mjs
 
 export const PALETTES = {
-  // maze vs bg ≥ 2.5:1 | letterColors vs bg ≥ 3.0:1 | glyph vs bg ≥ 4.5:1
-  vivid:     { bg: '#fdfdfd', maze: '#a2a2a2', glyph: null,      letterColors: ['#ff5a5a','#2ea39b','#2ea0bb','#b58e05','#6c5ce7','#8d84fe','#fc5691','#ca8503','#10a77d','#2e95ff'] },
-  dark:      { bg: '#1a1a2e', maze: '#49569c', glyph: null,      letterColors: ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#6c5ce7','#a29bfe','#fd79a8','#fdcb6e','#55efc4','#74b9ff'] },
-  neon:      { bg: '#0d0d0d', maze: '#4e4e7d', glyph: null,      letterColors: ['#ff0090','#00fff0','#aaff00','#ff6600','#9900ff','#00ccff','#ff3366','#ccff00','#ff9900','#33ffcc'] },
-  pastel:    { bg: '#fdf6f0', maze: '#c19575', glyph: null,      letterColors: ['#ff4f5f','#da7500','#949400','#00a624','#0391ff','#c95eff','#ff38bb','#2da35b','#df7117','#2f8fff'] },
-  earth:     { bg: '#f5f0e8', maze: '#ae966a', glyph: null,      letterColors: ['#c0392b','#8b5e3c','#c17b27','#6b8c42','#4a7c59','#7a4e2d','#b87333','#556b2f','#a0522d','#6b7c32'] },
-  mono:      { bg: '#ffffff', maze: '#a3a3a3', glyph: '#2c3e50', letterColors: null },
-  ink:       { bg: '#ffffff', maze: '#a3a3a3', glyph: '#000000', letterColors: null },
-  blueprint: { bg: '#0a1628', maze: '#28598c', glyph: '#7eb8d4', letterColors: null },
+  vivid:     { bg: '#ffffff', maze: '#e0e0e0', glyph: null,      letterColors: ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#6c5ce7','#a29bfe','#fd79a8','#fdcb6e','#55efc4','#74b9ff'] },
+  dark:      { bg: '#1a1a2e', maze: '#2d3561', glyph: null,      letterColors: ['#ff6b6b','#4ecdc4','#45b7d1','#f9ca24','#6c5ce7','#a29bfe','#fd79a8','#fdcb6e','#55efc4','#74b9ff'] },
+  neon:      { bg: '#0d0d0d', maze: '#1a1a2a', glyph: null,      letterColors: ['#ff0090','#00fff0','#aaff00','#ff6600','#9900ff','#00ccff','#ff3366','#ccff00','#ff9900','#33ffcc'] },
+  pastel:    { bg: '#fdf6f0', maze: '#e8d8cc', glyph: null,      letterColors: ['#ffb3ba','#ffdfba','#ffffba','#baffc9','#bae1ff','#e8baff','#ffd9f2','#c9f0d8','#f9dcc4','#d4e8ff'] },
+  earth:     { bg: '#f5f0e8', maze: '#c8b89a', glyph: null,      letterColors: ['#c0392b','#8b5e3c','#d4882b','#6b8c42','#4a7c59','#7a4e2d','#b87333','#556b2f','#a0522d','#6b7c32'] },
+  mono:      { bg: '#ffffff', maze: '#e0e0e0', glyph: '#2c3e50', letterColors: null },
+  ink:       { bg: '#ffffff', maze: '#aaaaaa', glyph: '#000000', letterColors: null },
+  blueprint: { bg: '#0a1628', maze: '#1a3a5c', glyph: '#7eb8d4', letterColors: null },
 };
 
 // Backwards-compat alias — batch script passes theme: 'classic' etc.
