@@ -2,6 +2,7 @@ import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import SvgGrid from './SvgGrid';
 import { MazeGlyph } from './MazeGlyph';
 import { PALETTES } from '../lib/svgBuilder';
+import AIPaletteModal from './AIPaletteModal';
 import './MazeGenerator.css';
 
 const SIZE_OPTIONS = [
@@ -90,6 +91,11 @@ const MazeGenerator = () => {
   const [seed, setSeed] = useState(() => {
     const v = params.get('seed'); return v !== null ? parseInt(v, 10) : null;
   });
+  const [customPalette, setCustomPalette] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('maze-font-custom-palette')); }
+    catch { return null; }
+  });
+  const [showAIModal, setShowAIModal] = useState(false);
   const [layoutTipOpen, setLayoutTipOpen] = useState(false);
   const [corridorsTipOpen, setCorridorsTipOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -105,6 +111,11 @@ const MazeGenerator = () => {
     ro.observe(gridRef.current);
     return () => ro.disconnect();
   }, []);
+
+  // Persist custom palette to localStorage
+  useEffect(() => {
+    if (customPalette) localStorage.setItem('maze-font-custom-palette', JSON.stringify(customPalette));
+  }, [customPalette]);
 
   // Clean up debounce timers on unmount
   useEffect(() => () => {
@@ -205,7 +216,14 @@ const MazeGenerator = () => {
     handleDownload();
   }, [gridSize, shouldAutoDownload]);
 
-  const renderOptions = { palette, showPath, regularWalls, handDrawn, pathColor, pathOpacity, pathWidth };
+  const handleApplyCustomPalette = (pal) => {
+    setCustomPalette(pal);
+    setPalette('custom');
+    if (pal.pathColor) setPathColor(pal.pathColor);
+    setShowAIModal(false);
+  };
+
+  const renderOptions = { palette, customPalette, showPath, regularWalls, handDrawn, pathColor, pathOpacity, pathWidth };
 
   return (
     <div className="maze-app">
@@ -324,6 +342,22 @@ const MazeGenerator = () => {
                 );
               })}
             </div>
+            {/* AI palette button — below the grid */}
+            <button
+              className={`palette-ai-btn${palette === 'custom' ? ' active' : ''}`}
+              onClick={() => setShowAIModal(true)}
+            >
+              {palette === 'custom' && customPalette ? (
+                <span className="palette-dots">
+                  {(customPalette.letterColors ?? [customPalette.glyph ?? customPalette.maze])
+                    .slice(0, 4)
+                    .map((c, i) => <span key={i} className="palette-dot" style={{ background: c }} />)}
+                </span>
+              ) : (
+                <span className="palette-ai-spark">✦</span>
+              )}
+              <span>{palette === 'custom' ? 'Custom (edit)' : 'Create with AI…'}</span>
+            </button>
           </div>
 
           {/* Layout */}
@@ -543,6 +577,13 @@ const MazeGenerator = () => {
         </div>
 
       </main>
+
+      {showAIModal && (
+        <AIPaletteModal
+          onApply={handleApplyCustomPalette}
+          onClose={() => setShowAIModal(false)}
+        />
+      )}
     </div>
   );
 };

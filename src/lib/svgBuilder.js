@@ -153,6 +153,7 @@ export function buildHandDrawnPathD(solutionPath, unitSize, rng) {
 export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, unitSize, offsetX, offsetY, rng) {
   const {
     palette: paletteId,
+    customPalette,
     theme = 'classic',
     showPath = false,
     regularWalls = false,
@@ -163,7 +164,9 @@ export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, un
   } = renderOptions ?? {};
 
   const resolvedId = paletteId ?? (theme === 'classic' ? 'vivid' : theme);
-  const th = PALETTES[resolvedId] ?? THEMES[resolvedId] ?? PALETTES.vivid;
+  const th = (paletteId === 'custom' && customPalette)
+    ? customPalette
+    : PALETTES[resolvedId] ?? THEMES[resolvedId] ?? PALETTES.vivid;
   const paletteColors = th.letterColors ?? LETTER_COLORS;
   const { glyphWalls, mazeWalls } = classifyWalls(wmResult, fontData);
   const solutionPath = wmResult.solutionPath ?? [];
@@ -257,9 +260,11 @@ export function buildSvgString(wmResult, fontData, renderOptions, svgW, svgH, un
  * Dependencies: wmResult, fontData, theme, regularWalls, dimensions.
  */
 export function buildMazeLayerSvg(wmResult, fontData, renderOptions, svgW, svgH, unitSize, offsetX, offsetY) {
-  const { palette: paletteId, theme = 'classic', regularWalls = false } = renderOptions ?? {};
+  const { palette: paletteId, customPalette, theme = 'classic', regularWalls = false } = renderOptions ?? {};
   const resolvedId = paletteId ?? (theme === 'classic' ? 'vivid' : theme);
-  const th = PALETTES[resolvedId] ?? THEMES[resolvedId] ?? PALETTES.vivid;
+  const th = (paletteId === 'custom' && customPalette)
+    ? customPalette
+    : PALETTES[resolvedId] ?? THEMES[resolvedId] ?? PALETTES.vivid;
   const paletteColors = th.letterColors ?? LETTER_COLORS;
   const { glyphWalls, mazeWalls } = classifyWalls(wmResult, fontData);
 

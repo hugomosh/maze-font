@@ -1,0 +1,333 @@
+/* ════════════════════════════════════════════════════════
+   AI Palette Modal
+════════════════════════════════════════════════════════ */
+
+.ai-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.ai-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+}
+
+/* Header */
+.ai-modal-header {
+  padding: 1rem 1.1rem 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ai-modal-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0d1b2a;
+}
+
+.ai-modal-close {
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  color: #aaa;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  transition: color 0.12s, background 0.12s;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.ai-modal-close:hover {
+  color: #333;
+  background: #f0f0f0;
+}
+
+/* Body */
+.ai-modal-body {
+  padding: 0.9rem 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+/* Steps */
+.ai-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ai-step-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c0c0c0;
+}
+
+/* Theme input */
+.ai-theme-input {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.85rem;
+  border: 1.5px solid #e8e8e8;
+  border-radius: 7px;
+  background: #fafafa;
+  color: #0d1b2a;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ai-theme-input:focus {
+  border-color: #4ecdc4;
+  background: #fff;
+}
+
+/* Chips */
+.ai-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.ai-chip {
+  padding: 0.22rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: #f4f4f4;
+  border: 1.5px solid transparent;
+  border-radius: 20px;
+  cursor: pointer;
+  color: #666;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  font-family: inherit;
+}
+
+.ai-chip:hover {
+  border-color: #4ecdc4;
+  color: #4ecdc4;
+  background: #f0fffe;
+}
+
+.ai-chip.active {
+  border-color: #4ecdc4;
+  color: #4ecdc4;
+  background: #f0fffe;
+  font-weight: 600;
+}
+
+/* Prompt block */
+.ai-prompt-block {
+  position: relative;
+  background: #f6f8fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ai-prompt-pre {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: #333;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0.7rem 0.8rem 0.7rem 0.8rem;
+  padding-right: 4.5rem; /* leave room for copy button */
+}
+
+.ai-copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: white;
+  border: 1.5px solid #d0d0d0;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #555;
+  transition: border-color 0.12s, color 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.ai-copy-btn:hover {
+  border-color: #4ecdc4;
+  color: #4ecdc4;
+}
+
+.ai-hint {
+  font-size: 0.72rem;
+  color: #999;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.ai-hint strong {
+  color: #555;
+}
+
+/* JSON textarea */
+.ai-json-textarea {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.6rem 0.7rem;
+  border: 1.5px solid #e8e8e8;
+  border-radius: 7px;
+  background: #fafafa;
+  color: #0d1b2a;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ai-json-textarea:focus {
+  border-color: #4ecdc4;
+  background: #fff;
+}
+
+.ai-json-textarea.has-error  { border-color: #ff6b6b; }
+.ai-json-textarea.has-success { border-color: #51cf66; }
+
+/* Validation error */
+.ai-error {
+  font-size: 0.72rem;
+  color: #e03131;
+  background: #fff5f5;
+  border: 1px solid #ffc9c9;
+  border-radius: 5px;
+  padding: 0.3rem 0.55rem;
+}
+
+/* Preview swatches */
+.ai-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: #f8f8f8;
+  border-radius: 7px;
+  border: 1px solid #ebebeb;
+}
+
+.ai-preview-bg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 28px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.ai-preview-maze {
+  display: block;
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  opacity: 0.9;
+}
+
+.ai-preview-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.ai-preview-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.ai-preview-path {
+  border-style: dashed;
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Action buttons */
+.ai-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.1rem;
+}
+
+.ai-cancel-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: none;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #888;
+  transition: border-color 0.12s, color 0.12s;
+  font-family: inherit;
+}
+
+.ai-cancel-btn:hover {
+  border-color: #bbb;
+  color: #555;
+}
+
+.ai-apply-btn {
+  padding: 0.5rem 1.2rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #4ecdc4, #45b7d1);
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  color: white;
+  transition: opacity 0.15s, transform 0.12s, box-shadow 0.12s;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(78, 205, 196, 0.3);
+}
+
+.ai-apply-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+}
+
+.ai-apply-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Thin scrollbar inside modal */
+.ai-modal::-webkit-scrollbar        { width: 4px; }
+.ai-modal::-webkit-scrollbar-track  { background: transparent; }
+.ai-modal::-webkit-scrollbar-thumb  { background: #e0e0e0; border-radius: 2px; }
